@@ -155,6 +155,61 @@ describe('seed custody', () => {
     expect(seedRes.raw).not.toContain(next.seed);
   });
 
+  it('survives two simultaneous rotations, leaving one active seed', async () => {
+    await ensureActiveSeed();
+    const before = (await activeRows())[0]!;
+
+    // Both callers contend on the same active row. The loser used to find no
+    // row after waiting and report "No active seed to rotate", which was
+    // misleading: nothing was wrong, it had simply lost a race.
+    const results = await Promise.all([rotateSeed(), rotateSeed()]);
+    expect(results).toHaveLength(2);
+
+    const rows = await activeRows();
+    const actives = rows.filter((r) => r.status === 'active');
+    const revealed = rows.filter((r) => r.status === 'revealed');
+
+    expect(actives).toHaveLength(1);
+    expect(actives[0]!.nonce).toBe(0n);
+    expect(actives[0]!.revealed_at).toBeNull();
+    expect(revealed).toHaveLength(2);
+
+    // Both disclosed seeds still hash to the commitments published for them.
+    for (const r of revealed) {
+      expect(sha256(r.seed)).toBe(r.seed_hash);
+      expect(r.revealed_at).not.toBeNull();
+    }
+    expect(revealed.map((r) => r.id)).toContain(before.id);
+
+    // The seed now in use is not disclosed anywhere public.
+    const seedRes = await getJson('/fairness/seed');
+    expect(seedRes.body).toEqual({ seedHash: actives[0]!.seed_hash, nonce: 0 });
+    expect(seedRes.raw).not.toContain(actives[0]!.seed);
+
+    const history = await getJson('/fairness/seeds');
+    expect(history.raw).not.toContain(actives[0]!.seed);
+  });
+
+  it('establishes seed custody as part of building the server', async () => {
+    // Not via ensureActiveSeed(): this pins the production boot path, so a
+    // refactor cannot drop seed initialisation from buildServer() while the
+    // lower-level tests stay green.
+    await getPool().query('TRUNCATE server_seeds RESTART IDENTITY CASCADE');
+    expect(await activeRows()).toHaveLength(0);
+
+    const booted = await buildServer();
+    try {
+      const rows = await activeRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.status).toBe('active');
+      expect(rows[0]!.nonce).toBe(0n);
+      expect(rows[0]!.seed).toMatch(HEX64);
+      expect(rows[0]!.seed_hash).toBe(sha256(rows[0]!.seed));
+    } finally {
+      await booted.close();
+    }
+  });
+
   it('GET /fairness/seeds is revealed history only, newest first', async () => {
     await ensureActiveSeed();
     const committedHash = (await getActiveCommitment())!.seedHash;

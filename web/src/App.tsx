@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { API_BASE, ApiError, api } from './api.ts';
+import { bootstrapSession } from './auth/bootstrap.ts';
 import { ActionsPanel } from './components/ActionsPanel.tsx';
 import { FairnessPanel } from './components/FairnessPanel.tsx';
 import { InvariantsStrip } from './components/InvariantsStrip.tsx';
@@ -28,40 +29,30 @@ export default function App() {
     setMe(await api.me());
   }, []);
 
-  // One session bootstrap on mount: ask who we are, log in only if nobody is,
-  // then ask again. Creating a session on every render would leave a trail of
-  // dead rows in the sessions table.
+  // StrictMode mounts effects twice in development. bootstrapSession()
+  // coalesces both mounts onto one in-flight attempt, so a browser boot creates
+  // at most one session row.
   useEffect(() => {
     let cancelled = false;
-    const boot = async () => {
-      try {
-        await loadMe();
-        if (!cancelled) setAuth('ready');
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 401) {
-          try {
-            await api.startSession();
-            await loadMe();
-            if (!cancelled) setAuth('ready');
-          } catch (inner) {
-            if (!cancelled) {
-              setAuthError((inner as Error).message);
-              setAuth('failed');
-            }
-          }
-          return;
-        }
-        if (!cancelled) {
-          setAuthError((err as Error).message);
-          setAuth('failed');
-        }
-      }
-    };
-    void boot();
+    bootstrapSession({
+      me: api.me,
+      startSession: api.startSession,
+      isUnauthenticated: (err) => err instanceof ApiError && err.status === 401,
+    })
+      .then((who) => {
+        if (cancelled) return;
+        setMe(who);
+        setAuth('ready');
+      })
+      .catch((err: Error) => {
+        if (cancelled) return;
+        setAuthError(err.message);
+        setAuth('failed');
+      });
     return () => {
       cancelled = true;
     };
-  }, [loadMe]);
+  }, []);
 
   const health = useApi(() => api.health(), []);
   const accounts = useApi(() => api.accounts(), []);

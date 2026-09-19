@@ -583,3 +583,70 @@ pill describes the design and names the test that asserts it, rather than
 implying it inspected the schema live, and the webhook pill shows the figures
 the storm you ran returned rather than inventing cumulative statistics no
 endpoint reports.
+
+---
+
+## D37 — The property test judges outcomes with its own oracle
+
+`api/test/property/random_ops.test.ts` runs 100–500 randomly generated
+operations — deposit, bet, rotate, duplicate webhook — against the real service
+and real Postgres, re-checking every invariant after each one.
+
+The oracle that judges settled bets is implemented in the test file from the
+specification, using `node:crypto`, and shares no code with the implementation.
+Importing `computeOutcome()` or `payoutFor()` would make the property
+tautological: a mutation to production would move the expected answer with it
+and the test would stay green while the system broke. Changing the payout
+numerator from 9900 to 10000 fails the property on the first generated bet;
+so does changing the HMAC message separator.
+
+Every operation is derived from generated values and its index, never from
+`Math.random()`, `crypto.randomUUID()` or the clock, so fast-check's reported
+seed and path replay a failure exactly. One webhook slot always means one
+payload, so an idempotency key can never refer to two different amounts.
+
+Expected business refusals — `INSUFFICIENT_FUNDS`, `DAILY_LOSS_LIMIT` and the
+rest — are counted and carried on from; they are decisions the system is
+entitled to make. Anything else aborts the sequence.
+
+Slot amounts are spread across 1,000–50,000 rather than being the slot number.
+An earlier version derived them as `1 + (slot % 50_000)` over a small slot
+range, which produced deposits of a few minor units; the sequence degenerated
+into several hundred `INSUFFICIENT_FUNDS` refusals and never reached the daily
+limit at all.
+
+---
+
+## D38 — Concurrent rotation retries instead of reporting a phantom absence
+
+Two rotations starting together contend on the active seed row. The loser's
+`SELECT … FOR UPDATE` returns nothing once it acquires the lock, because
+Postgres rechecks the locked tuple against `status = 'active'` and the seed it
+waited for is now revealed. That was reported as `No active seed to rotate`,
+which is misleading — nothing was wrong, it had simply lost a race.
+
+It now re-runs the select once, the same shape H4 already uses when allocating a
+nonce, and picks up the successor the winner installed. Two simultaneous
+operator rotations therefore serialise into two legitimate rotations. Removing
+the retry turns the concurrency test red on every run.
+
+The partial unique index remains the guard; nothing here is an application lock.
+
+---
+
+## D39 — Session bootstrap is coalesced, because StrictMode mounts twice
+
+React StrictMode runs effects twice in development. Cancelling the second
+caller's state update is not enough: both mounts still reach the network, both
+see 401, and both `POST /session` — one browser boot, two live session rows,
+observed in the H6 walkthrough as two 401s.
+
+`web/src/auth/bootstrap.ts` coalesces simultaneous callers onto a single
+in-flight promise. A real dev browser boot now issues one `POST /session` and
+`GET /me` returns `[401, 200]` instead of `[401, 401, 200, 200]`. The promise is
+cleared on failure so a transient error does not poison the page permanently.
+
+The test mock answers from session state rather than call order. An earlier
+version counted calls, which let the second caller see "already signed in"
+merely because it ran second — it passed against an implementation that did not
+coalesce at all.

@@ -74,12 +74,24 @@ export const rotateSeed = async (): Promise<{
   next: { seedHash: string };
 }> =>
   withTx(async (client) => {
-    const current = await client.query<{ id: bigint; seed: string; seed_hash: string }>(
-      `SELECT id, seed, seed_hash FROM server_seeds
-       WHERE status = 'active'
-       FOR UPDATE`,
-    );
-    const active = current.rows[0];
+    const selectActive = () =>
+      client.query<{ id: bigint; seed: string; seed_hash: string }>(
+        `SELECT id, seed, seed_hash FROM server_seeds
+         WHERE status = 'active'
+         FOR UPDATE`,
+      );
+
+    // A rotation that committed while this statement waited on its row leaves
+    // this query with nothing: Postgres rechecks the locked tuple against
+    // status = 'active' and the seed it was waiting for is now revealed. That is
+    // a lost race, not an absence of seeds, so the successor is picked up by a
+    // fresh statement -- the same shape H4 uses when allocating a nonce. Two
+    // simultaneous operator rotations therefore serialise into two legitimate
+    // rotations rather than one misleading internal error.
+    let active = (await selectActive()).rows[0];
+    if (!active) {
+      active = (await selectActive()).rows[0];
+    }
     if (!active) {
       throw new Error('No active seed to rotate');
     }
