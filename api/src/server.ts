@@ -4,6 +4,7 @@ import cookie from '@fastify/cookie';
 import { config } from './config.js';
 import { closePool } from './db.js';
 import { runMigrations } from './migrate.js';
+import { isRefusal } from './refusals.js';
 import { registerRoutes } from './routes/index.js';
 
 export const buildServer = async (): Promise<FastifyInstance> => {
@@ -35,6 +36,20 @@ export const buildServer = async (): Promise<FastifyInstance> => {
   });
 
   await app.register(cookie, { secret: config.sessionSecret });
+
+  // A refusal is a decision, not a failure: it carries its own status and a
+  // stable code. Anything else is a real error and must not leak its internals.
+  app.setErrorHandler((err, req, reply) => {
+    if (isRefusal(err)) {
+      return reply.status(err.httpStatus).send(err.toBody());
+    }
+    req.log.error({ err }, 'unhandled error');
+    return reply.status(500).send({
+      refused: false,
+      code: 'INTERNAL_ERROR',
+      message: 'Unexpected error.',
+    });
+  });
 
   await registerRoutes(app);
 

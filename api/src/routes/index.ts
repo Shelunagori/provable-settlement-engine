@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { ping } from '../db.js';
 import { migrationStatus } from '../migrate.js';
+import { registerLedgerRoutes } from './ledger.js';
 
 const bootedAt = Date.now();
 
@@ -21,4 +22,6 @@ export const registerRoutes = async (app: FastifyInstance): Promise<void> => {
       uptimeSeconds: Math.floor((Date.now() - bootedAt) / 1000),
     };
   });
+
+  await registerLedgerRoutes(app);
 };

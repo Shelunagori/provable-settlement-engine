@@ -117,3 +117,83 @@ No global state library. Everything rendered is derived from an API response,
 and every action refetches. The single piece of logic in the browser is
 `lib/verify.ts`, which recomputes outcomes locally — that one is the point, so
 it must not be able to fall back to trusting the server.
+
+---
+
+## D11 — `postEntry()` runs inside the caller's transaction and never opens one
+
+It takes a `PoolClient` and issues no `BEGIN` or `COMMIT`. The balance it reads
+and the postings it writes have to be one unit of work: if they were not, the
+refusal would be a decision about a balance that no longer exists by the time
+the postings land, and a caller's rollback would leave the money behind.
+
+This is covered by a test that posts an entry and then throws from inside
+`withTx`; the entry must not survive. That test was added after the property
+turned out to be unenforced — mutating `postEntry()` to commit its own work
+passed the entire suite.
+
+---
+
+## D12 — The lock order is a property of the query plan, not an assumption
+
+`lockAccounts()` issues one statement: `SELECT id, kind FROM accounts WHERE id =
+ANY($1) ORDER BY id FOR UPDATE`. Postgres is documented to allow `ORDER BY` to
+be applied *after* locking in some plans, which would make the ordering
+worthless for deadlock avoidance. The plan here is:
+
+```
+LockRows
+  ->  Sort
+        Sort Key: id
+        ->  Bitmap Heap Scan on accounts
+```
+
+`LockRows` sits above `Sort`, so rows are ordered before any lock is taken.
+Checked rather than assumed, and worth re-checking if the query ever grows a
+join.
+
+---
+
+## D13 — The funds check is on net movement per account, not per posting
+
+An entry may post more than once to the same account. The check is therefore
+whether the account's *net* movement within the entry would take its derived
+balance below zero, rather than whether any individual posting is negative.
+
+For every entry this system currently writes the two readings coincide, because
+no entry debits and credits the same user account. They diverge only for an
+entry like `user -1000, user +1000`, which leaves the balance untouched and
+which the net reading allows. That seems right — the entry as a whole moves
+nothing — but it is a reading of the requirement rather than a quotation of it,
+and it is cheap to reverse if the stricter per-posting rule is wanted.
+
+---
+
+## D14 — `postEntry()` does not check that postings sum to zero
+
+Deliberately. That check is the deferred constraint trigger's job, and
+duplicating it in TypeScript would move the apparent authority into application
+code and mask a trigger that had silently stopped working.
+
+The `sum_is_zero` test depends on this: it writes unbalanced postings through
+raw SQL, asserts the INSERTs succeed, and asserts that `COMMIT` is what refuses.
+Dropping the trigger turns that test red while the rest of the suite stays
+green, which is the evidence that Postgres — not this codebase — is enforcing it.
+
+---
+
+## D15 — `/ledger/invariants` checks per entry as well as globally
+
+A global `SUM(amount_minor) = 0` can hide two entries whose errors cancel out.
+The endpoint therefore also counts entries whose own postings do not sum to
+zero, and `sumIsZero` is true only when both are clean. Every field is read from
+the database on each request; nothing is cached and nothing is hard-coded.
+
+---
+
+## D16 — Money crosses the API boundary as a JSON number, once
+
+Internally every amount is `bigint`. Route handlers pass their result through
+`jsonSafe()`, which converts `bigint` to `number` at the single point where the
+response is serialised and throws rather than truncate if a value ever left the
+safe integer range. Handlers never convert money themselves.
