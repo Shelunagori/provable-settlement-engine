@@ -64,27 +64,40 @@ export const postEntry = async (
   );
   const userAccounts = new Set(accounts.filter((a) => a.kind === 'user').map((a) => a.id));
 
-  // 2 & 3. An entry may post more than once to the same account, so the test is
-  // the account's net movement within this entry, not each posting in isolation.
-  const netByAccount = new Map<string, bigint>();
+  // 2 & 3. Every debit against a user account is tested, accumulated across the
+  // entry, against the balance that account held before the entry began.
+  //
+  // Credits in the same entry are not netted off: money this entry is itself
+  // creating cannot be what funds it, so `user -1000, user +1000` against a
+  // balance of 0 is refused even though it nets to nothing. And the debits are
+  // accumulated rather than tested one at a time, so a balance of 1000 cannot
+  // absorb `-600` twice by measuring each against an untouched 1000.
+  const debitsByAccount = new Map<string, bigint[]>();
   for (const p of postings) {
-    netByAccount.set(p.account, (netByAccount.get(p.account) ?? 0n) + p.amountMinor);
+    if (p.amountMinor >= 0n || !userAccounts.has(p.account)) continue;
+    const list = debitsByAccount.get(p.account) ?? [];
+    list.push(-p.amountMinor);
+    debitsByAccount.set(p.account, list);
   }
 
-  for (const [accountId, net] of [...netByAccount].sort(([a], [b]) => (a < b ? -1 : 1))) {
-    if (net >= 0n || !userAccounts.has(accountId)) continue;
+  for (const accountId of [...debitsByAccount.keys()].sort()) {
+    const debits = debitsByAccount.get(accountId)!;
+    const startingBalance = await derivedBalanceTx(client, accountId);
 
-    const balance = await derivedBalanceTx(client, accountId);
-    if (balance + net < 0n) {
-      throw new RefusalError(
-        'INSUFFICIENT_FUNDS',
-        `Account ${accountId} holds ${balance} and cannot absorb a debit of ${-net}`,
-        {
-          accountId,
-          balanceMinor: Number(balance),
-          requestedMinor: Number(-net),
-        },
-      );
+    let cumulativeDebits = 0n;
+    for (const debit of debits) {
+      cumulativeDebits += debit;
+      if (cumulativeDebits > startingBalance) {
+        throw new RefusalError(
+          'INSUFFICIENT_FUNDS',
+          `Account ${accountId} holds ${startingBalance} and cannot absorb debits totalling ${cumulativeDebits}`,
+          {
+            accountId,
+            balanceMinor: Number(startingBalance),
+            requestedMinor: Number(cumulativeDebits),
+          },
+        );
+      }
     }
   }
 

@@ -154,20 +154,24 @@ join.
 
 ---
 
-## D13 — The funds check is on net movement per account, not per posting
+## D13 — The funds guard is per debit, accumulated, against the starting balance
 
-An entry may post more than once to the same account. The check is therefore
-whether the account's *net* movement within the entry would take its derived
-balance below zero, rather than whether any individual posting is negative.
+Every negative posting against a `kind='user'` account is tested. Credits in the
+same entry are not netted off, and the debits are accumulated rather than tested
+one at a time. The comparison is always against the balance the account held
+before the entry began, read once under the row lock.
 
-For every entry this system currently writes the two readings coincide, because
-no entry debits and credits the same user account. They diverge only for an
-entry like `user -1000, user +1000`, which leaves the balance untouched and
-which the net reading allows. That seems right — the entry as a whole moves
-nothing — but it is a reading of the requirement rather than a quotation of it,
-and it is cheap to reverse if the stricter per-posting rule is wanted.
+Both halves of that matter, and each is held by its own test:
 
----
+- **Credits do not fund debits.** `user -1000, user +1000` against a balance of 0
+  nets to nothing, but the money the credit supplies is money this same entry is
+  creating. It cannot be collateral for the debit that creates it. Refused.
+- **Debits accumulate.** A balance of 1000 with `-600, -600` in one entry must be
+  refused. Measuring each debit against an untouched 1000 would pass both.
+
+An earlier version of this decision netted positive and negative postings per
+account and compared the net movement. That allowed the first shape above. It
+was a reading of the requirement rather than the requirement, and it was wrong.
 
 ## D14 — `postEntry()` does not check that postings sum to zero
 
