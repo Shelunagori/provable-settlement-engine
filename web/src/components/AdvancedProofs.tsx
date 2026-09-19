@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Badge, Button, Card, Copy, Empty, SectionHeading, StatusDot } from './ui.tsx';
+import { Badge, Button, Card, Disclosure, Empty, HashValue, SectionHeading, StatusDot } from './ui.tsx';
 import { LedgerView } from './LedgerView.tsx';
 import { RefusalCard } from './RefusalCard.tsx';
 import { RefusalTable } from './RefusalTable.tsx';
 import { PROOF } from './proofs.ts';
-import { formatMinor, formatTime, shortHash } from '../format.ts';
+import { formatMinor, formatTime } from '../format.ts';
 import type { useEngine } from '../hooks/useEngine.ts';
 import type {
   AccountBalance,
@@ -17,15 +17,15 @@ import type {
 
 const TABS = [
   { id: 'ledger', label: 'Ledger' },
-  { id: 'payments', label: 'Payment idempotency' },
-  { id: 'refusals', label: 'Refusals' },
-  { id: 'fairness', label: 'Fairness history' },
+  { id: 'payments', label: 'Duplicate protection' },
+  { id: 'rules', label: 'Server rules' },
+  { id: 'fairness', label: 'Fairness' },
   { id: 'affiliate', label: 'Affiliate' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
 
-const REFUSAL_SEED = 'refusal-probe';
+const PROBE_SEED = 'refusal-probe';
 
 export const AdvancedProofs = ({
   engine,
@@ -58,15 +58,15 @@ export const AdvancedProofs = ({
     void engine.placeBet({
       amountMinor: over.amountMinor ?? 500,
       targetUnder: over.targetUnder ?? '50.00',
-      clientSeed: REFUSAL_SEED,
+      clientSeed: PROBE_SEED,
     });
 
   return (
-    <section id="proofs" className="scroll-mt-24 pt-16">
+    <section id="proofs" className="scroll-mt-20 pt-14">
       <SectionHeading
         eyebrow="Advanced proofs"
         title="Look underneath"
-        lead="The same system, without the guided path: the raw ledger, the duplicate-payment storm, the full refusal table, seed history and affiliate accrual."
+        lead="The same system without the guided path, for anyone who wants the raw evidence."
       />
 
       <div className="mb-4 overflow-x-auto">
@@ -81,9 +81,7 @@ export const AdvancedProofs = ({
               type="button"
               onClick={() => setTab(t.id)}
               className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors ${
-                tab === t.id
-                  ? 'border-accent text-ink'
-                  : 'border-transparent text-muted hover:text-ink'
+                tab === t.id ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink'
               }`}
             >
               {t.label}
@@ -92,7 +90,7 @@ export const AdvancedProofs = ({
         </div>
       </div>
 
-      <Card className="p-4 sm:p-6">
+      <Card tier="technical" className="p-4 sm:p-6">
         {tab === 'ledger' && (
           <div role="tabpanel" id="panel-ledger" aria-labelledby="tab-ledger">
             <LedgerView
@@ -107,74 +105,65 @@ export const AdvancedProofs = ({
 
         {tab === 'payments' && (
           <div role="tabpanel" id="panel-payments" aria-labelledby="tab-payments">
-            <h3 className="text-sm font-semibold">{PROOF.webhooks.title}</h3>
-            <p className="mt-2 max-w-3xl text-sm text-muted">{PROOF.webhooks.body}</p>
+            <h3 className="text-base font-semibold">Duplicate payment protection</h3>
+            <p className="mt-1.5 max-w-2xl text-sm text-ink-2">
+              The same payment notification is sent 20 times at once. Only one may move money.
+            </p>
             <div className="mt-4">
-              <Button
-                variant="primary"
-                onClick={() => void engine.runStorm(20)}
-                busy={engine.busy === 'storm'}
-              >
-                Send the same payment 20 times
+              <Button variant="primary" onClick={() => void engine.runStorm(20)} busy={engine.busy === 'storm'}>
+                Run duplicate test
               </Button>
             </div>
 
             {storm && (
               <div className="mt-5 animate-rise">
-                <div className="grid gap-3 sm:grid-cols-4">
+                <div className="grid max-w-xl gap-3 sm:grid-cols-3">
                   {[
-                    { label: 'Notifications sent', value: storm.sent },
-                    { label: 'HTTP deliveries', value: storm.httpDeliveries },
-                    { label: 'Money moved', value: storm.posted },
-                    { label: 'Ignored as duplicates', value: storm.deduplicated },
+                    { value: storm.sent, label: 'received' },
+                    { value: storm.posted, label: 'settled' },
+                    { value: storm.deduplicated, label: 'ignored safely' },
                   ].map((s) => (
-                    <div key={s.label} className="rounded-lg border border-line bg-bg/40 px-3 py-3">
-                      <p className="mono text-2xl">{s.value}</p>
-                      <p className="mt-1 text-xs text-muted">{s.label}</p>
+                    <div key={s.label} className="rounded-lg border border-line bg-surface px-3 py-3 text-center">
+                      <p className="num text-3xl font-semibold">{s.value}</p>
+                      <p className="mt-0.5 text-xs text-muted">{s.label}</p>
                     </div>
                   ))}
                 </div>
-                <dl className="mt-4 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
-                  <div className="flex gap-2">
-                    <dt className="text-muted">Distinct journal entries</dt>
-                    <dd className={`mono ${storm.distinctEntryIds === 1 ? 'text-accent' : 'text-refusal'}`}>
-                      {storm.distinctEntryIds}
-                    </dd>
-                  </div>
-                  <div className="flex gap-2">
-                    <dt className="text-muted">Failed</dt>
-                    <dd className="mono">{storm.failed}</dd>
-                  </div>
-                  <div className="flex gap-2 sm:col-span-2">
-                    <dt className="text-muted">Event id</dt>
-                    <dd className="mono break-all">{storm.eventId}</dd>
-                  </div>
-                </dl>
-                <p className="mt-3 text-sm">
+                <p className="mt-4 text-sm font-medium text-accent-text">
                   <StatusDot
                     tone={storm.distinctEntryIds === 1 ? 'accent' : 'refusal'}
-                    label={`${storm.sent} identical notifications produced ${storm.distinctEntryIds} journal entry`}
+                    label={storm.distinctEntryIds === 1 ? 'Duplicate protection held ✓' : 'Duplicate protection failed ✗'}
                   />
                 </p>
+                <p className="mono mt-1.5 text-xs text-muted">
+                  {storm.distinctEntryIds} ledger entry · {storm.httpDeliveries} HTTP deliveries ·{' '}
+                  {storm.failed} failed
+                </p>
+                <div className="mt-2">
+                  <HashValue value={storm.eventId} label="event id" tone="muted" head={10} tail={6} />
+                </div>
               </div>
             )}
-            <p className="mono mt-5 text-xs text-muted">Proof: {PROOF.webhooks.test}</p>
+
+            <Disclosure summary="Technical details" className="mt-5">
+              {PROOF.webhooks.body}
+              <p className="mono mt-2 text-muted">Proof: {PROOF.webhooks.test}</p>
+            </Disclosure>
           </div>
         )}
 
-        {tab === 'refusals' && (
-          <div role="tabpanel" id="panel-refusals" aria-labelledby="tab-refusals">
-            <h3 className="text-sm font-semibold">Ask for something the server will not do</h3>
-            <p className="mt-2 max-w-3xl text-sm text-muted">
-              Each button sends a request that breaks one rule. The server answers with a named
-              code and structured detail rather than a generic failure.
+        {tab === 'rules' && (
+          <div role="tabpanel" id="panel-rules" aria-labelledby="tab-rules">
+            <h3 className="text-base font-semibold">Ask for something the server will not do</h3>
+            <p className="mt-1.5 max-w-2xl text-sm text-ink-2">
+              Each button breaks one rule. The server answers with a reason, not a generic failure.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button size="sm" onClick={() => probe({ amountMinor: 99 })} busy={engine.busy === 'bet'}>
-                Stake below the minimum
+                Stake below minimum
               </Button>
               <Button size="sm" onClick={() => probe({ amountMinor: 60_000 })} busy={engine.busy === 'bet'}>
-                Stake above the maximum
+                Stake above maximum
               </Button>
               <Button size="sm" onClick={() => probe({ targetUnder: '99.00' })} busy={engine.busy === 'bet'}>
                 Target out of range
@@ -182,45 +171,37 @@ export const AdvancedProofs = ({
               <Button
                 size="sm"
                 onClick={() =>
-                  void engine.replayLastBet({
-                    amountMinor: 500,
-                    targetUnder: '50.00',
-                    clientSeed: REFUSAL_SEED,
-                  })
+                  void engine.replayLastBet({ amountMinor: 500, targetUnder: '50.00', clientSeed: PROBE_SEED })
                 }
                 busy={engine.busy === 'bet'}
                 disabled={!engine.lastBetId}
               >
-                Replay the same request id
+                Replay same request
               </Button>
               {insufficientReachable && (
                 <Button size="sm" onClick={() => probe({ amountMinor: 500 })} busy={engine.busy === 'bet'}>
-                  Spend more than the balance
+                  Spend more than balance
                 </Button>
               )}
             </div>
 
             {!engine.lastBetId && (
-              <p className="mt-2 text-xs text-muted">
-                Replaying a request id needs an outcome to replay — place one in the demo first.
-              </p>
+              <p className="mt-2 text-xs text-muted">Replaying a request needs one to replay — run the demo first.</p>
             )}
             {!insufficientReachable && (
               <p className="mt-2 text-xs text-muted">
-                Refusing for insufficient funds needs a balance below the stake. Spend down rather
-                than resetting the ledger to reach it.
+                Refusing for insufficient funds needs a balance below the stake. Spend down rather than
+                resetting the ledger to reach it.
               </p>
             )}
 
             {engine.refusal && (
-              <div className="mt-4 max-w-2xl animate-rise">
+              <div className="mt-4 max-w-xl animate-rise">
                 <RefusalCard status={engine.refusal.status} body={engine.refusal.body} />
               </div>
             )}
             {engine.failure && (
-              <p className="mt-4 border-l-2 border-refusal pl-3 text-sm text-refusal">
-                {engine.failure.message}
-              </p>
+              <p className="mt-4 border-l-2 border-refusal pl-3 text-sm text-refusal">{engine.failure.message}</p>
             )}
 
             <div className="mt-6">{refusals && <RefusalTable rows={refusals} />}</div>
@@ -231,28 +212,25 @@ export const AdvancedProofs = ({
           <div role="tabpanel" id="panel-fairness" aria-labelledby="tab-fairness">
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="min-w-0">
-                <h3 className="text-sm font-semibold">Revealed seeds</h3>
-                <p className="mt-1 text-xs text-muted">
-                  Retired seeds, disclosed in full. Every outcome they produced can be recomputed
-                  from them.
+                <h3 className="text-base font-semibold">Revealed secrets</h3>
+                <p className="mt-1 text-sm text-ink-2">
+                  Retired secrets, disclosed in full. Every result they produced can be recomputed.
                 </p>
-                {revealed && revealed.length === 0 && (
-                  <Empty>No seed has been retired yet.</Empty>
-                )}
+                {revealed && revealed.length === 0 && <Empty>Nothing has been revealed yet.</Empty>}
                 {revealed && revealed.length > 0 && (
                   <ul className="mt-3 space-y-2">
                     {revealed.slice(0, 6).map((s) => (
-                      <li
-                        key={s.seedHash}
-                        className="rounded-lg border border-line bg-bg/40 px-3 py-2 text-xs"
-                      >
+                      <li key={s.seedHash} className="rounded-lg border border-line bg-surface px-3 py-2">
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className="mono text-fairness">{shortHash(s.seedHash, 12, 8)}</span>
-                          <span className="mono text-muted">{formatTime(s.revealedAt)}</span>
+                          <span className="text-xs text-muted">Commitment</span>
+                          <span className="mono text-xs text-muted">{formatTime(s.revealedAt)}</span>
                         </div>
-                        <div className="mono mt-1 flex items-baseline gap-2 break-all text-muted">
-                          {shortHash(s.seed, 16, 8)}
-                          <Copy value={s.seed} label="revealed seed" />
+                        <div className="mt-1">
+                          <HashValue value={s.seedHash} label="commitment" />
+                        </div>
+                        <div className="mt-1.5 flex items-baseline gap-2">
+                          <span className="text-xs text-muted">Secret</span>
+                          <HashValue value={s.seed} label="revealed secret" tone="muted" />
                         </div>
                       </li>
                     ))}
@@ -261,8 +239,8 @@ export const AdvancedProofs = ({
               </div>
 
               <div className="min-w-0">
-                <h3 className="text-sm font-semibold">How an outcome is computed</h3>
-                <pre className="mono mt-3 overflow-x-auto rounded-lg border border-line bg-bg/60 px-3 py-3 text-xs">
+                <h3 className="text-base font-semibold">How a result is computed</h3>
+                <pre className="mono mt-3 overflow-x-auto rounded-lg border border-line bg-surface px-3 py-3 text-xs">
 {`hmac = HMAC_SHA256(
   key     = UTF8(serverSeed),
   message = UTF8(\`\${clientSeed}:\${nonce}\`)
@@ -270,13 +248,13 @@ export const AdvancedProofs = ({
 roll = (first 8 hex of hmac as integer) % 10000 / 100
 win  = roll < targetUnder        (strictly less than)`}
                 </pre>
-                <p className="mt-3 text-sm text-muted">
-                  The server seed is 64 lowercase hex characters, and it is that text which is
-                  hashed and keyed — not the 32 bytes it encodes. The hash is published before the
-                  seed is used; the plaintext is disclosed only after rotation, which is what makes
-                  any of this checkable.
-                </p>
-                <p className="mono mt-3 text-xs text-muted">Proof: {PROOF.seed.test}</p>
+                <Disclosure summary="Why the encoding matters" className="mt-3">
+                  The server seed is 64 lowercase hex characters, and it is that text which is hashed
+                  and keyed — not the 32 bytes it encodes. The commitment is published before the seed
+                  is used; the plaintext is disclosed only after rotation, which is what makes any of
+                  this checkable.
+                  <p className="mono mt-2 text-muted">Proof: {PROOF.seed.test}</p>
+                </Disclosure>
               </div>
             </div>
           </div>
@@ -284,19 +262,16 @@ win  = roll < targetUnder        (strictly less than)`}
 
         {tab === 'affiliate' && (
           <div role="tabpanel" id="panel-affiliate" aria-labelledby="tab-affiliate">
-            <h3 className="text-sm font-semibold">Commission accrues as postings</h3>
-            <p className="mt-2 max-w-3xl text-sm text-muted">
-              An affiliate’s earnings are not a counter that someone increments. They are the sum
-              of commission postings to that account, which is why the figure below can never
-              disagree with the ledger.
+            <h3 className="text-base font-semibold">Commission accrues as postings</h3>
+            <p className="mt-1.5 max-w-2xl text-sm text-ink-2">
+              An affiliate's earnings are the sum of commission postings, not a counter someone
+              increments — so the figure can never disagree with the ledger.
             </p>
             {affiliate ? (
               <div className="mt-4 flex flex-wrap items-end gap-6">
                 <div>
                   <p className="text-xs uppercase tracking-wider text-muted">Earned</p>
-                  <p className="num mt-1 text-3xl font-semibold">
-                    {formatMinor(affiliate.earnedMinor)}
-                  </p>
+                  <p className="num mt-1 text-3xl font-semibold">{formatMinor(affiliate.earnedMinor)}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider text-muted">Referred</p>

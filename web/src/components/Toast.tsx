@@ -27,8 +27,8 @@ const Toast = ({ toast, dismiss }: { toast: ToastMessage; dismiss: (id: number) 
   }, [toast.id, dismiss]);
 
   return (
-    <div className="pointer-events-auto flex max-w-[min(32rem,100%)] items-center gap-3 rounded-md border border-line bg-surface px-3 py-2 text-sm shadow-lg">
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true" />
+    <div className="pointer-events-auto flex max-w-[min(32rem,100%)] items-center gap-3 rounded-md border border-line bg-surface px-3 py-2 text-sm shadow-lift">
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-vivid" aria-hidden="true" />
       <span className="text-xs">{toast.text}</span>
       <button
         type="button"

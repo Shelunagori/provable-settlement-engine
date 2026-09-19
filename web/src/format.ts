@@ -44,23 +44,27 @@ export const relativeTime = (iso: string): string => {
 
 /** Plain-language names for ledger accounts, with the raw id kept alongside. */
 export const ACCOUNT_LABEL: Record<string, string> = {
-  'user:demo': 'Demo user',
+  'user:demo': 'Demo wallet',
   treasury: 'Treasury',
   pending_bets: 'Pending',
-  gateway: 'Gateway',
+  gateway: 'Payment gateway',
   'affiliate:alice': 'Affiliate',
 };
 
 export const accountLabel = (id: string): string => ACCOUNT_LABEL[id] ?? id;
 
-/** Plain-language names for journal entry kinds. */
+/**
+ * What each journal entry means in plain language. The raw kind stays visible
+ * as a secondary line wherever this is used, so nothing is hidden -- it is
+ * simply no longer the first thing anyone reads.
+ */
 export const ENTRY_LABEL: Record<string, string> = {
-  deposit: 'Deposit',
-  bet_lock: 'Stake held',
-  round_resolved: 'Outcome computed',
-  bet_settle: 'Settled',
-  commission: 'Commission',
-  withdrawal: 'Withdrawal',
+  deposit: 'Funds added',
+  bet_lock: 'Stake reserved',
+  round_resolved: 'Outcome created',
+  bet_settle: 'Outcome settled',
+  commission: 'Affiliate credit',
+  withdrawal: 'Funds withdrawn',
 };
 
 export const entryLabel = (kind: string): string => ENTRY_LABEL[kind] ?? kind;

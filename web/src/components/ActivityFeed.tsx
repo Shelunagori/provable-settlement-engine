@@ -3,15 +3,15 @@ import { accountLabel, entryLabel, formatSignedMinor, relativeTime } from '../fo
 import type { JournalEntry } from '../types.ts';
 
 const TONE: Record<string, string> = {
-  deposit: 'bg-accent',
-  bet_lock: 'bg-pending',
-  round_resolved: 'bg-fairness',
-  bet_settle: 'bg-accent',
-  commission: 'bg-fairness',
+  deposit: 'bg-accent-vivid',
+  bet_lock: 'bg-pending-vivid',
+  round_resolved: 'bg-fairness-vivid',
+  bet_settle: 'bg-accent-vivid',
+  commission: 'bg-fairness-vivid',
   withdrawal: 'bg-muted',
 };
 
-/** The journal, read as a stream of events rather than a table of rows. */
+/** The journal read as a stream of events. The raw kind stays on line two. */
 export const ActivityFeed = ({
   entries,
   loading,
@@ -19,18 +19,18 @@ export const ActivityFeed = ({
   entries: JournalEntry[] | null;
   loading: boolean;
 }) => (
-  <section id="activity" className="scroll-mt-24 pt-16">
+  <section id="activity" className="scroll-mt-20 pt-14">
     <SectionHeading
       eyebrow="Activity"
       title="Everything that has moved"
-      lead="Each line is a journal entry written by the server. There is no separate activity log to fall out of step with the ledger — this is the ledger."
+      lead="Each line is a journal entry written by the server. This is the ledger itself, not a log beside it."
     />
 
     <Card className="p-2 sm:p-3">
       {loading && !entries && (
         <div className="space-y-2 p-3">
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-10 w-full" />
+            <Skeleton key={i} className="h-11 w-full" />
           ))}
         </div>
       )}
@@ -38,7 +38,7 @@ export const ActivityFeed = ({
       {entries && entries.length === 0 && <Empty>Nothing has happened yet.</Empty>}
 
       {entries && entries.length > 0 && (
-        <ul className="divide-y divide-line/60">
+        <ul className="divide-y divide-line">
           {entries.slice(0, 12).map((e) => {
             const credits = e.postings.filter((p) => p.amountMinor > 0);
             const value = credits.reduce((a, p) => a + p.amountMinor, 0);
@@ -48,16 +48,19 @@ export const ActivityFeed = ({
                   className={`h-2 w-2 shrink-0 rounded-full ${TONE[e.kind] ?? 'bg-muted'}`}
                   aria-hidden="true"
                 />
-                <span className="text-sm">{entryLabel(e.kind)}</span>
-                <span className="hidden truncate text-xs text-muted sm:inline">
-                  {credits.map((p) => accountLabel(p.account)).join(', ') || 'lifecycle marker'}
-                </span>
-                <span className="mono ml-auto shrink-0 text-sm">
-                  {value === 0 ? '—' : formatSignedMinor(value)}
-                </span>
-                <span className="mono w-10 shrink-0 text-right text-xs text-muted">
-                  {relativeTime(e.createdAt)}
-                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm">{entryLabel(e.kind)}</p>
+                  <p className="mono truncate text-[11px] text-muted">
+                    {e.kind} · entry #{e.id}
+                    {credits.length > 0 && ` · ${credits.map((p) => accountLabel(p.account)).join(', ')}`}
+                  </p>
+                </div>
+                <div className="ml-auto shrink-0 text-right">
+                  <p className="num text-sm">{value === 0 ? '—' : formatSignedMinor(value)}</p>
+                  <p className="mono text-[11px] text-muted">
+                    {relativeTime(e.createdAt) === 'now' ? 'just now' : `${relativeTime(e.createdAt)} ago`}
+                  </p>
+                </div>
               </li>
             );
           })}

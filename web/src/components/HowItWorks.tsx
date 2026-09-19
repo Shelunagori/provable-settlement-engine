@@ -1,43 +1,65 @@
 import { Card, SectionHeading } from './ui.tsx';
+import {
+  CopyIcon,
+  FingerprintIcon,
+  LockIcon,
+  ScalesIcon,
+  ShieldCheckIcon,
+} from './icons.tsx';
 
-const STEPS = [
+const GUARANTEES = [
   {
-    title: 'Money is double-entry',
-    body: 'Nothing is added to a balance. A movement is a set of postings across accounts that sums to zero, written in one transaction. The database enforces the zero sum with a deferred constraint trigger, so a hand-written INSERT is rejected exactly like an application bug would be.',
+    icon: ScalesIcon,
+    title: 'Balanced ledger',
+    body: 'Every movement is a set of postings that sums to zero, enforced by the database itself.',
+    test: 'sum_is_zero.test.ts',
   },
   {
-    title: 'A balance is a question, not a column',
-    body: 'Asking for a balance sums that account’s postings at read time, inside the same transaction that is about to spend it. Rows are locked in a fixed order so two concurrent requests cannot both believe the money is theirs.',
+    icon: ShieldCheckIcon,
+    title: 'Derived balances',
+    body: 'A balance is summed from postings when you ask for it. Nothing stores one.',
+    test: 'balance_is_derived.test.ts',
   },
   {
-    title: 'Payments are claimed, not checked',
-    body: 'A payment notification is claimed by its event id with an insert that does nothing on conflict. Duplicates lose the race at the unique index rather than being filtered by a prior read, so there is no window between checking and acting.',
+    icon: CopyIcon,
+    title: 'Duplicate-safe payments',
+    body: 'A payment is claimed by its event id, so repeats lose the race instead of moving money.',
+    test: 'exactly_once.test.ts',
   },
   {
-    title: 'The outcome is fixed before you play',
-    body: 'The server publishes the hash of a secret seed. Your outcome is HMAC-SHA256 of your client seed and a nonce, keyed by that secret. When the seed is retired it is disclosed, and anyone can recompute every outcome it produced — including in a browser, as step 05 does.',
+    icon: LockIcon,
+    title: 'Server-side limits',
+    body: 'Funds, limits and validity are decided on the server and answered with a named code.',
+    test: 'never_negative.test.ts',
   },
   {
-    title: 'Refusals are part of the design',
-    body: 'A rejected action returns a named code, an HTTP status and structured detail. The list of codes is generated from the same table the server enforces, so the documentation cannot drift away from the behaviour.',
+    icon: FingerprintIcon,
+    title: 'Verifiable outcomes',
+    body: 'The result is fixed by a published commitment and can be recomputed by anyone.',
+    test: 'deterministic_outcome.test.ts',
   },
 ];
 
 export const HowItWorks = () => (
-  <section id="how" className="scroll-mt-24 pt-16">
+  <section id="how" className="scroll-mt-20 pt-14">
     <SectionHeading
       eyebrow="How it works"
-      title="Five rules the server will not bend"
-      lead="The interface is a window onto these rules. It cannot relax any of them, because it never decides anything."
+      title="Five guarantees behind every result"
+      lead="The interface cannot relax any of them, because it never decides anything."
     />
-    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-      {STEPS.map((s, i) => (
-        <Card key={s.title} className="p-5" raised>
-          <p className="mono text-xs text-muted">{String(i + 1).padStart(2, '0')}</p>
-          <h3 className="mt-2 text-base font-semibold">{s.title}</h3>
-          <p className="mt-2 text-sm leading-relaxed text-muted">{s.body}</p>
-        </Card>
+    <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      {GUARANTEES.map(({ icon: Icon, ...g }) => (
+        <li key={g.title}>
+          <Card as="div" className="h-full p-5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent-text">
+              <Icon className="h-4 w-4" />
+            </span>
+            <h3 className="mt-3 text-base font-semibold">{g.title}</h3>
+            <p className="mt-1.5 text-sm leading-relaxed text-ink-2">{g.body}</p>
+            <p className="mono mt-3 text-[11px] text-muted">{g.test}</p>
+          </Card>
+        </li>
       ))}
-    </div>
+    </ul>
   </section>
 );

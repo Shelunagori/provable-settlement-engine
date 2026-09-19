@@ -686,3 +686,47 @@ separate `--c-on-accent` so filled buttons stay legible in both schemes. Measure
 in a real browser after the full journey, in both colour schemes and with the
 refusal, table and drawer states open, no rendered text falls below its WCAG AA
 contrast threshold.
+
+---
+
+## D41 — Light is the default, and the palette carries two greens
+
+The redesign in D40 proved the system but still read as an inspector: dark,
+dense, and technical before it was useful. The console now opens light, and a
+Light / Dark / System control in the header remembers the choice in
+`localStorage`. There is no endpoint that stores a theme, and adding one would
+mean the interface holding state the server does not know about.
+
+Absence of a stored choice resolves to light, not to the operating system's
+preference. "System" is something a person opts into, so a first visit is the
+light experience on every machine. `src/theme.ts` sets `data-theme` before the
+first render, which is also what stops a dark-theme visitor seeing a light
+flash.
+
+Each hue is defined twice: a text-safe value and a vivid one. The vivid value
+paints dots, progress bars and fills that carry no text; the text-safe value is
+used for anything a person reads. That split is what lets the palette stay
+bright and still clear WCAG AA — the requested `#16b981` is 2.53:1 against white
+and fails as a button fill, so `#16b981` became the vivid marker and `#0b8256`
+the filled-button green, with white text at 4.84:1. Amber, blue and red are
+split the same way for the same reason. Measured in a real browser after the
+full journey in both themes, with refusals, the rule table, the mobile menu and
+every disclosure open, no rendered text falls below its AA threshold.
+
+Language changed alongside colour. "Place an outcome" was never something a
+person says, so the primary action is *Run demo* throughout; the reveal step
+asks to *Reveal commitment* rather than to retire a seed; accounts are named
+(Demo wallet, Pending, Treasury, Payment gateway, Affiliate) with the raw id on
+hover; journal kinds read as events with the raw kind on a second line; and a
+refusal leads with "Request refused" and the server's own message, keeping the
+code and HTTP status as a quiet footer. Hashes truncate to head and tail with
+Copy and View full, so proof stays one click away without setting the visual
+weight of the card it sits in.
+
+Measured against D40's layout: the hero block is 17.3% shorter (713px → 590px at
+1440×900) and rendered prose is down 42.9% (727 → 415 words). Total on-screen
+text is slightly higher, because the raw journal kinds, entry ids and account
+ids that used to *be* the copy are now kept as secondary evidence beside it.
+
+None of this reaches the server. No endpoint, request shape or business rule
+changed, and the boundary in D36 still holds: the interface decides nothing.

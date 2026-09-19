@@ -8,11 +8,13 @@ import { Hero } from './components/Hero.tsx';
 import { HowItWorks } from './components/HowItWorks.tsx';
 import { ProofRail } from './components/ProofRail.tsx';
 import { TopNav } from './components/TopNav.tsx';
+import { TrustCards } from './components/TrustCards.tsx';
 import { WalletCard } from './components/WalletCard.tsx';
 import { Toasts, type ToastMessage } from './components/Toast.tsx';
 import { ErrorState } from './components/ui.tsx';
 import { useApi } from './hooks/useApi.ts';
 import { useEngine } from './hooks/useEngine.ts';
+import { applyTheme, readTheme, storeTheme, type Theme } from './theme.ts';
 import type { Me } from './types.ts';
 
 type AuthState = 'checking' | 'ready' | 'failed';
@@ -26,6 +28,13 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [theme, setThemeState] = useState<Theme>(() => readTheme());
+
+  const setTheme = useCallback((next: Theme) => {
+    setThemeState(next);
+    applyTheme(next);
+    storeTheme(next);
+  }, []);
 
   const toast = useCallback((text: string) => {
     setToasts((prev) => [...prev, { id: Date.now() + Math.random(), text }]);
@@ -102,14 +111,14 @@ export default function App() {
     <div className="min-h-screen">
       <a
         href="#demo"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-raised focus:px-4 focus:py-2"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2"
       >
         Skip to the demo
       </a>
 
-      <TopNav apiUp={apiUp} apiLoading={health.loading} me={me} />
+      <TopNav apiUp={apiUp} apiLoading={health.loading} me={me} theme={theme} setTheme={setTheme} />
 
-      <main className="mx-auto max-w-console px-4 pb-20 sm:px-6">
+      <main className="mx-auto max-w-console px-4 pb-16 sm:px-6">
         {auth === 'failed' && (
           <div className="mt-6">
             <ErrorState
@@ -127,12 +136,14 @@ export default function App() {
               loading={auth === 'checking'}
               depositBusy={engine.busy === 'deposit'}
               onDeposit={() => void engine.deposit(1000)}
-              onPlay={() => scrollTo('#demo')}
+              onRunDemo={() => scrollTo('#demo')}
             />
           }
         />
 
-        <div className="grid gap-10 pt-16 lg:grid-cols-12 lg:gap-8">
+        <TrustCards />
+
+        <div className="grid gap-10 pt-12 lg:grid-cols-12 lg:gap-8">
           <div className="lg:col-span-8">
             <GuidedDemo
               engine={engine}
@@ -145,7 +156,6 @@ export default function App() {
           <div className="lg:col-span-4">
             <ProofRail
               invariants={invariants.data}
-              invariantsLoading={invariants.loading}
               commitment={commitment.data}
               verification={engine.verification}
               balanceProbe={engine.balanceProbe}
@@ -174,32 +184,33 @@ export default function App() {
       </main>
 
       <footer className="border-t border-line">
-        <div className="mx-auto flex max-w-console flex-wrap items-center gap-x-6 gap-y-2 px-4 py-8 text-xs text-muted sm:px-6">
+        <div className="mx-auto flex max-w-console flex-wrap items-center gap-x-6 gap-y-2 px-4 py-7 text-xs text-muted sm:px-6">
           <p>
-            Everything shown is derived from the ledger. The interface holds no financial state of
-            its own.
+            Everything shown is derived from the ledger. The interface holds no money state of its
+            own.
           </p>
-          <span className="mono ml-auto">api {API_BASE}</span>
+          <span className="mono ml-auto">{API_BASE}</span>
         </div>
-        <div className="mx-auto flex max-w-console flex-wrap gap-4 px-4 pb-10 text-xs sm:px-6">
+        <div className="mx-auto flex max-w-console flex-wrap items-center gap-4 px-4 pb-8 text-xs sm:px-6">
           <a
-            className="text-muted underline underline-offset-2 hover:text-ink"
+            className="text-ink-2 underline underline-offset-2 hover:text-ink"
             href="https://github.com/Shelunagori/provable-settlement-engine#readme"
           >
             README
           </a>
           <a
-            className="text-muted underline underline-offset-2 hover:text-ink"
+            className="text-ink-2 underline underline-offset-2 hover:text-ink"
             href="https://github.com/Shelunagori/provable-settlement-engine/blob/main/docs/REFUSALS.md"
           >
             Refusal codes
           </a>
           <a
-            className="text-muted underline underline-offset-2 hover:text-ink"
+            className="text-ink-2 underline underline-offset-2 hover:text-ink"
             href="https://github.com/Shelunagori/provable-settlement-engine/blob/main/docs/DECISIONS.md"
           >
             Design decisions
           </a>
+          <span className="mono ml-auto text-muted">{me?.userId ?? '—'}</span>
         </div>
       </footer>
 

@@ -1,23 +1,40 @@
 import { formatMinor } from '../format.ts';
+import { ShieldCheckIcon } from './icons.tsx';
 
 const SKIP = new Set(['refused', 'code', 'message']);
+
+/** Field names as a person would read them; unknown keys fall back to the key. */
+const FIELD_LABEL: Record<string, string> = {
+  limit: 'Maximum',
+  min: 'Minimum',
+  max: 'Maximum',
+  requestedAmount: 'Requested',
+  balanceMinor: 'Balance',
+  netLossToday: 'Lost today',
+  targetUnder: 'Target',
+  betId: 'Request ID',
+  seedHash: 'Commitment',
+};
+
+const label = (key: string) =>
+  FIELD_LABEL[key] ?? key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 
 const renderValue = (key: string, value: unknown): string => {
   if (value === null || value === undefined) return '—';
   if (typeof value === 'object') return JSON.stringify(value);
   if (
     typeof value === 'number' &&
-    /minor$|^limit$|^requestedAmount$|^netLossToday$|^balanceMinor$/i.test(key)
+    /minor$|^limit$|^min$|^max$|^requestedAmount$|^netLossToday$|^balanceMinor$/i.test(key)
   ) {
-    return `${formatMinor(value)} (${value})`;
+    return formatMinor(value);
   }
   return String(value);
 };
 
 /**
- * A refusal rendered as what it is: a decision with a code, not an error blob.
- * Details are laid out as rows rather than stringified, and unknown keys are
- * still shown, so a refusal this component has never seen is still readable.
+ * A refusal is a decision, not a stack trace. The sentence a person needs comes
+ * first; the code and HTTP status stay visible underneath for anyone who wants
+ * to look it up in the refusal table.
  */
 export const RefusalCard = ({
   status,
@@ -29,22 +46,27 @@ export const RefusalCard = ({
   const details = Object.entries(body).filter(([k]) => !SKIP.has(k));
 
   return (
-    <div className="border-l-2 border-refusal bg-bg/40 py-2 pl-3 pr-2">
-      <div className="flex flex-wrap items-baseline gap-2">
-        <span className="num text-xs font-medium text-refusal">{String(body.code)}</span>
-        <span className="num text-[10px] text-muted">HTTP {status}</span>
+    <div className="rounded-xl border border-refusal/30 border-l-4 border-l-refusal bg-refusal-soft px-4 py-3.5">
+      <div className="flex items-center gap-2">
+        <ShieldCheckIcon className="h-4 w-4 shrink-0 text-refusal" />
+        <p className="text-sm font-semibold text-refusal">Request refused</p>
       </div>
-      <p className="mt-1 text-sm">{String(body.message ?? '')}</p>
+      <p className="mt-1.5 text-base text-ink">{String(body.message ?? '')}</p>
+
       {details.length > 0 && (
-        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+        <dl className="mt-3 grid max-w-sm gap-x-6 gap-y-1 text-sm">
           {details.map(([k, v]) => (
-            <div key={k} className="contents">
-              <dt className="num text-[11px] text-muted">{k}</dt>
-              <dd className="num break-all text-[11px]">{renderValue(k, v)}</dd>
+            <div key={k} className="flex items-baseline justify-between gap-6">
+              <dt className="text-ink-2">{label(k)}</dt>
+              <dd className="mono min-w-0 break-all text-right">{renderValue(k, v)}</dd>
             </div>
           ))}
         </dl>
       )}
+
+      <p className="mono mt-3 text-xs text-muted">
+        {String(body.code)} · HTTP {status}
+      </p>
     </div>
   );
 };

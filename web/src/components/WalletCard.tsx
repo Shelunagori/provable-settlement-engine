@@ -1,10 +1,12 @@
-import { Badge, Button, Card, Skeleton, StatusDot } from './ui.tsx';
+import { Badge, Button, Card, Disclosure, Skeleton } from './ui.tsx';
+import { WalletIcon } from './icons.tsx';
 import { formatMinor, formatSignedMinor } from '../format.ts';
 import type { AccountBalance, Me } from '../types.ts';
 
 /**
- * The wallet shows what the ledger says, and says where the number came from.
- * It holds no money state of its own: every figure here is a server response.
+ * The strongest component on the page, so it gets the primary card treatment.
+ * Human wording leads; how the figure is derived is one click away rather than
+ * printed under the balance.
  */
 export const WalletCard = ({
   me,
@@ -12,26 +14,28 @@ export const WalletCard = ({
   loading,
   depositBusy,
   onDeposit,
-  onPlay,
+  onRunDemo,
 }: {
   me: Me | null;
   accounts: AccountBalance[] | null;
   loading: boolean;
   depositBusy: boolean;
   onDeposit: () => void;
-  onPlay: () => void;
+  onRunDemo: () => void;
 }) => {
-  const pending = accounts?.find((a) => a.accountId === 'pending_bets')?.balanceMinor ?? null;
+  const inPlay = accounts?.find((a) => a.accountId === 'pending_bets')?.balanceMinor ?? null;
   const ready = me !== null;
 
   return (
-    <Card className="p-5 sm:p-6" raised>
+    <Card tier="primary" className="p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-soft text-accent-text">
+            <WalletIcon className="h-4 w-4" />
+          </span>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-            Your demo wallet
+            Demo wallet
           </p>
-          <p className="mono mt-1 text-xs text-muted">{me?.userId ?? 'signing in…'}</p>
         </div>
         <Badge tone="fairness">Demo funds</Badge>
       </div>
@@ -44,38 +48,36 @@ export const WalletCard = ({
         ) : (
           <Skeleton className="h-11 w-48" />
         )}
-        <p className="mt-2 text-sm text-muted">
-          Summed from the ledger — not stored anywhere as a balance.
-        </p>
+        <p className="mt-2 text-sm text-ink-2">Available demo balance</p>
+        <Disclosure summary="How is this calculated?" className="mt-1.5">
+          Your balance is the sum of ledger postings. There is no editable balance field, and no
+          endpoint that writes one.
+        </Disclosure>
       </div>
 
       <dl className="mt-5 grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-line bg-bg/40 px-3 py-2">
-          <dt className="text-[11px] uppercase tracking-wider text-muted">Net today</dt>
+        <div className="rounded-lg border border-line bg-subtle px-3 py-2">
+          <dt className="text-[11px] uppercase tracking-wider text-muted">Today</dt>
           <dd className="num mt-0.5 text-sm">
             {ready ? formatSignedMinor(me.dailyNetMinor) : '—'}
           </dd>
         </div>
-        <div className="rounded-lg border border-line bg-bg/40 px-3 py-2">
-          <dt className="text-[11px] uppercase tracking-wider text-muted">Held in play</dt>
+        <div className="rounded-lg border border-line bg-subtle px-3 py-2">
+          <dt className="text-[11px] uppercase tracking-wider text-muted">In play</dt>
           <dd className="num mt-0.5 text-sm">
-            {pending === null ? '—' : formatMinor(Math.abs(pending))}
+            {inPlay === null ? '—' : formatMinor(Math.abs(inPlay))}
           </dd>
         </div>
       </dl>
 
       <div className="mt-5 flex flex-wrap gap-2">
         <Button variant="primary" onClick={onDeposit} busy={depositBusy} disabled={loading}>
-          Add 10.00 funds
+          Add 10.00
         </Button>
-        <Button variant="secondary" onClick={onPlay}>
-          Place an outcome
+        <Button variant="secondary" onClick={onRunDemo}>
+          Run demo
         </Button>
       </div>
-
-      <p className="mt-4 text-xs text-muted">
-        <StatusDot tone="accent" label="Funds arrive as a payment webhook, exactly as production would." />
-      </p>
     </Card>
   );
 };

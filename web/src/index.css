@@ -2,39 +2,156 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Light is the default, deliberately: no theme attribute and no stored
+ * preference resolves to the light palette, never to the operating system's
+ * dark mode. `data-theme="dark"` opts in; `data-theme="system"` follows the OS.
+ * src/theme.ts sets the attribute before the app renders.
+ *
+ * Each hue has a text-safe value and a vivid value. The vivid one is for dots,
+ * bars and fills that carry no text; the text-safe one is for anything a person
+ * has to read. That split is what keeps the palette bright and still AA.
+ */
 :root {
-  --c-bg: #090b0f;
-  --c-surface: #10141b;
-  --c-raised: #151a22;
-  --c-border: #232b36;
-  --c-text: #f3f5f7;
-  --c-muted: #8f99a8;
+  --c-bg: #f7f9fc;
+  --c-surface: #ffffff;
+  --c-subtle: #f3f6f9;
+  --c-raised: #ffffff;
+  --c-border: #dde3ea;
+  --c-border-strong: #cbd5e1;
 
-  --c-accent: #34d399;   /* verified / success */
-  --c-on-accent: #04170f; /* text on an accent-filled surface */
-  --c-fairness: #60a5fa; /* commitment / crypto */
-  --c-pending: #fbbf24;  /* waiting */
-  --c-refusal: #fb7185;  /* refused */
+  --c-text: #111827;
+  --c-text-2: #475569;
+  --c-muted: #5b6775;
+
+  /* Green: primary action, success, verified, healthy, balanced. */
+  --c-accent: #0b8256;        /* filled surfaces -- carries white text */
+  --c-accent-hover: #0a6f49;
+  --c-accent-text: #0a6f49;   /* accent-coloured text and small marks */
+  --c-accent-vivid: #16b981;  /* dots, progress fill: never behind text */
+  --c-accent-soft: #ecfdf5;
+  --c-accent-border: #a7f3d0;
+  --c-on-accent: #ffffff;
+
+  /* Blue: technical proof, commitment, hash, information. */
+  --c-fairness: #2563eb;
+  --c-fairness-vivid: #3b82f6;
+  --c-fairness-soft: #eff6ff;
+
+  /* Amber: pending, attention. */
+  --c-pending: #b45309;
+  --c-pending-vivid: #f59e0b;
+  --c-pending-soft: #fffbeb;
+
+  /* Red: refused, failed, invalid. */
+  --c-refusal: #c81e1e;
+  --c-refusal-vivid: #ef4444;
+  --c-refusal-soft: #fef2f2;
+
+  --c-shadow-1: rgba(15, 23, 42, 0.06);
+  --c-shadow-2: rgba(15, 23, 42, 0.10);
+
+  color-scheme: light;
+}
+
+/*
+ * The dark palette the redesign shipped with, kept intact. Declared once and
+ * applied from two selectors so "dark" and "system + OS dark" stay identical.
+ */
+:root[data-theme='dark'],
+:root[data-theme='system'] {
+  --dark-bg: #090b0f;
+  --dark-surface: #10141b;
+  --dark-subtle: #0d1117;
+  --dark-raised: #151a22;
+  --dark-border: #232b36;
+  --dark-border-strong: #384454;
+  --dark-text: #f3f5f7;
+  --dark-text-2: #b3bcc9;
+  --dark-muted: #8f99a8;
+  --dark-accent: #34d399;
+  --dark-accent-hover: #6ee7b7;
+  --dark-accent-text: #34d399;
+  --dark-accent-vivid: #34d399;
+  --dark-accent-soft: #0b2b20;
+  --dark-accent-border: #1c5540;
+  --dark-on-accent: #04170f;
+  --dark-fairness: #60a5fa;
+  --dark-fairness-vivid: #60a5fa;
+  --dark-fairness-soft: #101f35;
+  --dark-pending: #fbbf24;
+  --dark-pending-vivid: #fbbf24;
+  --dark-pending-soft: #2a2008;
+  --dark-refusal: #fb7185;
+  --dark-refusal-vivid: #fb7185;
+  --dark-refusal-soft: #2c1219;
+  --dark-shadow-1: rgba(0, 0, 0, 0.24);
+  --dark-shadow-2: rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme='dark'] {
+  --c-bg: var(--dark-bg);
+  --c-surface: var(--dark-surface);
+  --c-subtle: var(--dark-subtle);
+  --c-raised: var(--dark-raised);
+  --c-border: var(--dark-border);
+  --c-border-strong: var(--dark-border-strong);
+  --c-text: var(--dark-text);
+  --c-text-2: var(--dark-text-2);
+  --c-muted: var(--dark-muted);
+  --c-accent: var(--dark-accent);
+  --c-accent-hover: var(--dark-accent-hover);
+  --c-accent-text: var(--dark-accent-text);
+  --c-accent-vivid: var(--dark-accent-vivid);
+  --c-accent-soft: var(--dark-accent-soft);
+  --c-accent-border: var(--dark-accent-border);
+  --c-on-accent: var(--dark-on-accent);
+  --c-fairness: var(--dark-fairness);
+  --c-fairness-vivid: var(--dark-fairness-vivid);
+  --c-fairness-soft: var(--dark-fairness-soft);
+  --c-pending: var(--dark-pending);
+  --c-pending-vivid: var(--dark-pending-vivid);
+  --c-pending-soft: var(--dark-pending-soft);
+  --c-refusal: var(--dark-refusal);
+  --c-refusal-vivid: var(--dark-refusal-vivid);
+  --c-refusal-soft: var(--dark-refusal-soft);
+  --c-shadow-1: var(--dark-shadow-1);
+  --c-shadow-2: var(--dark-shadow-2);
 
   color-scheme: dark;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --c-bg: #f6f7f9;
-    --c-surface: #ffffff;
-    --c-raised: #ffffff;
-    --c-border: #e3e7ec;
-    --c-text: #111827;
-    --c-muted: #5b6573;
-
-    --c-accent: #047857;
-    --c-on-accent: #ffffff;
-    --c-fairness: #1d4ed8;
-    --c-pending: #92400e;
-    --c-refusal: #be123c;
-
-    color-scheme: light;
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='system'] {
+    --c-bg: var(--dark-bg);
+    --c-surface: var(--dark-surface);
+    --c-subtle: var(--dark-subtle);
+    --c-raised: var(--dark-raised);
+    --c-border: var(--dark-border);
+    --c-border-strong: var(--dark-border-strong);
+    --c-text: var(--dark-text);
+    --c-text-2: var(--dark-text-2);
+    --c-muted: var(--dark-muted);
+    --c-accent: var(--dark-accent);
+    --c-accent-hover: var(--dark-accent-hover);
+    --c-accent-text: var(--dark-accent-text);
+    --c-accent-vivid: var(--dark-accent-vivid);
+    --c-accent-soft: var(--dark-accent-soft);
+    --c-accent-border: var(--dark-accent-border);
+    --c-on-accent: var(--dark-on-accent);
+    --c-fairness: var(--dark-fairness);
+    --c-fairness-vivid: var(--dark-fairness-vivid);
+    --c-fairness-soft: var(--dark-fairness-soft);
+    --c-pending: var(--dark-pending);
+    --c-pending-vivid: var(--dark-pending-vivid);
+    --c-pending-soft: var(--dark-pending-soft);
+    --c-refusal: var(--dark-refusal);
+    --c-refusal-vivid: var(--dark-refusal-vivid);
+    --c-refusal-soft: var(--dark-refusal-soft);
+    --c-shadow-1: var(--dark-shadow-1);
+    --c-shadow-2: var(--dark-shadow-2);
+  
+    color-scheme: dark;
   }
 }
 
@@ -68,7 +185,7 @@ body {
 :focus-visible {
   outline: 2px solid var(--c-accent);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 @keyframes rise {
@@ -92,5 +209,6 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

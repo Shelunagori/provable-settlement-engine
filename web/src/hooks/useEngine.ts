@@ -176,5 +176,17 @@ export const useEngine = ({
       setRefusal(null);
       setFailure(null);
     },
+    /**
+     * Start the journey again without erasing anything the server recorded.
+     * Only this page's view of "where am I" is cleared -- the ledger, the
+     * journal and the revealed seed history are untouched.
+     */
+    restart: () => {
+      setBet(null);
+      setReveal(null);
+      setVerification(null);
+      setRefusal(null);
+      setFailure(null);
+    },
   };
 };

@@ -28,7 +28,7 @@ export const Drawer = ({
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center sm:items-center">
       <div
-        className="absolute inset-0 bg-black/50"
+        className="absolute inset-0 bg-black/40"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -36,7 +36,7 @@ export const Drawer = ({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative max-h-[80vh] w-full max-w-lg overflow-auto rounded-t-lg border border-line bg-surface p-4 sm:rounded-lg"
+        className="relative max-h-[80vh] w-full max-w-lg overflow-auto rounded-t-lg border border-line bg-surface p-5 shadow-lift sm:rounded-lg"
       >
         <div className="mb-2 flex items-start justify-between gap-3">
           <h3 className="text-sm font-medium">{title}</h3>
@@ -50,7 +50,7 @@ export const Drawer = ({
             close
           </button>
         </div>
-        <div className="space-y-2 text-sm text-muted">{children}</div>
+        <div className="space-y-2 text-sm text-ink-2">{children}</div>
       </div>
     </div>
   );

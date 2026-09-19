@@ -5,7 +5,7 @@ export const RefusalTable = ({ rows }: { rows: RefusalRow[] }) => {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="rounded border border-line">
+    <div className="rounded-lg border border-line bg-surface">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -13,9 +13,9 @@ export const RefusalTable = ({ rows }: { rows: RefusalRow[] }) => {
         className="flex w-full items-center justify-between px-3 py-2 text-left"
       >
         <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-          Refusal table · {rows.length} codes
+          Every rule the server enforces · {rows.length}
         </span>
-        <span className="num text-xs text-muted" aria-hidden="true">
+        <span className="mono text-xs text-muted" aria-hidden="true">
           {open ? '−' : '+'}
         </span>
       </button>
@@ -33,9 +33,9 @@ export const RefusalTable = ({ rows }: { rows: RefusalRow[] }) => {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.code} className="border-b border-line/60 align-top last:border-0">
-                  <td className="num px-3 py-2 text-refusal">{r.code}</td>
-                  <td className="num px-3 py-2 text-muted">{r.httpStatus}</td>
+                <tr key={r.code} className="border-b border-line align-top last:border-0">
+                  <td className="mono px-3 py-2 text-refusal">{r.code}</td>
+                  <td className="mono px-3 py-2 text-muted">{r.httpStatus}</td>
                   <td className="px-3 py-2">{r.summary}</td>
                   <td className="px-3 py-2 text-muted">{r.enforcedIn}</td>
                 </tr>

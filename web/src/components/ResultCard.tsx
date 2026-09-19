@@ -1,10 +1,10 @@
-import { Badge, Card, Copy, PostingRows } from './ui.tsx';
-import { accountLabel, formatMinor, formatSignedMinor } from '../format.ts';
+import { Badge, Card, HashValue, MoneyFlow } from './ui.tsx';
+import { formatMinor, formatSignedMinor } from '../format.ts';
 import type { JournalEntry, PlacedBet } from '../types.ts';
 
 /**
- * The moment the demo exists for: what the roll was, whether it won, what
- * changed in the ledger, and the identifiers needed to verify it later.
+ * The centrepiece: the number first, what it cost or paid second, and the two
+ * ledger movements underneath in the order they actually happened.
  */
 export const ResultCard = ({
   bet,
@@ -16,79 +16,78 @@ export const ResultCard = ({
   const byId = (id: number) => entries?.find((e) => e.id === id) ?? null;
   const lock = byId(bet.entryIds[0]);
   const settle = byId(bet.entryIds[1]);
-  const tone = bet.won ? 'accent' : 'refusal';
-  const rollTone = bet.won ? 'text-accent' : 'text-refusal';
 
   return (
-    <Card className="animate-rise overflow-hidden" raised>
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line px-5 py-5 sm:px-6">
+    <Card tier="primary" className="animate-rise overflow-hidden">
+      <div className="grid gap-5 px-5 py-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-            Roll (0.00 – 99.99)
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Result</p>
+          <p
+            className={`num text-result font-semibold ${bet.won ? 'text-accent-text' : 'text-refusal'}`}
+          >
+            {bet.roll.toFixed(2)}
           </p>
-          <p className={`num text-result font-semibold ${rollTone}`}>{bet.roll.toFixed(2)}</p>
-          <p className="mt-1 text-sm text-muted">
-            Target was under {bet.bet.targetUnder.toFixed(2)} — the roll must be strictly
-            below it.
+          <p className="mt-1">
+            <Badge tone={bet.won ? 'accent' : 'refusal'}>{bet.won ? 'Win' : 'Loss'}</Badge>
           </p>
         </div>
-        <div className="text-right">
-          <Badge tone={tone}>{bet.won ? 'Won' : 'Lost'}</Badge>
-          <p className="num mt-2 text-2xl font-semibold">
-            {bet.won ? formatMinor(bet.payoutMinor) : formatSignedMinor(-bet.bet.amountMinor)}
-          </p>
-          <p className="text-xs text-muted">{bet.won ? 'paid out' : 'stake kept by treasury'}</p>
-        </div>
+
+        <dl className="grid gap-x-6 gap-y-1.5 text-sm sm:min-w-[15rem]">
+          <div className="flex items-baseline justify-between gap-6">
+            <dt className="text-ink-2">Stake</dt>
+            <dd className="num">{formatMinor(bet.bet.amountMinor)}</dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-6">
+            <dt className="text-ink-2">Payout</dt>
+            <dd className="num">{formatMinor(bet.payoutMinor)}</dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-6">
+            <dt className="text-ink-2">Target under</dt>
+            <dd className="num">{bet.bet.targetUnder.toFixed(2)}</dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-6">
+            <dt className="shrink-0 text-ink-2">Round</dt>
+            <dd className="min-w-0">
+              <HashValue value={bet.bet.roundId} label="round id" tone="muted" head={6} tail={4} />
+            </dd>
+          </div>
+        </dl>
       </div>
 
-      <div className="grid gap-4 px-5 py-5 sm:px-6 md:grid-cols-2">
-        <div className="min-w-0">
-          <h4 className="text-sm font-semibold">Money moved: stake held</h4>
-          <p className="mt-1 text-xs text-muted">Entry #{bet.entryIds[0]}</p>
-          <div className="mt-2">
+      <div className="border-t border-line px-5 py-5 sm:px-6">
+        <h3 className="text-sm font-semibold">How the money moved</h3>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="min-w-0">
             {lock ? (
-              <PostingRows postings={lock.postings} format={formatSignedMinor} />
+              <MoneyFlow
+                title="Stake reserved"
+                entryId={bet.entryIds[0]}
+                postings={lock.postings}
+                format={formatSignedMinor}
+              />
             ) : (
               <p className="text-xs text-muted">Postings load with the journal.</p>
             )}
           </div>
-        </div>
-        <div className="min-w-0">
-          <h4 className="text-sm font-semibold">Money moved: settled</h4>
-          <p className="mt-1 text-xs text-muted">Entry #{bet.entryIds[1]}</p>
-          <div className="mt-2">
+          <div className="min-w-0">
             {settle ? (
-              <PostingRows postings={settle.postings} format={formatSignedMinor} />
+              <MoneyFlow
+                title="Settlement"
+                entryId={bet.entryIds[1]}
+                postings={settle.postings}
+                format={formatSignedMinor}
+              />
             ) : (
               <p className="text-xs text-muted">Postings load with the journal.</p>
             )}
           </div>
         </div>
+        <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+          Commitment
+          <HashValue value={bet.seedHash} label="commitment hash" />
+          · nonce <span className="mono">{bet.nonce}</span>
+        </p>
       </div>
-
-      <dl className="grid gap-x-6 gap-y-2 border-t border-line px-5 py-4 text-xs sm:grid-cols-2 sm:px-6">
-        <div className="flex items-baseline gap-2">
-          <dt className="w-20 shrink-0 text-muted">Round</dt>
-          <dd className="mono min-w-0 break-all">{bet.bet.roundId}</dd>
-        </div>
-        <div className="flex items-baseline gap-2">
-          <dt className="w-20 shrink-0 text-muted">Nonce</dt>
-          <dd className="mono">{bet.nonce}</dd>
-        </div>
-        <div className="flex items-baseline gap-2 sm:col-span-2">
-          <dt className="w-20 shrink-0 text-muted">Commitment</dt>
-          <dd className="mono flex min-w-0 items-baseline gap-2 break-all text-fairness">
-            {bet.seedHash}
-            <Copy value={bet.seedHash} label="commitment hash" />
-          </dd>
-        </div>
-        <div className="flex items-baseline gap-2 sm:col-span-2">
-          <dt className="w-20 shrink-0 text-muted">Accounts</dt>
-          <dd className="text-muted">
-            {['user:demo', 'pending_bets', 'treasury'].map(accountLabel).join(' · ')}
-          </dd>
-        </div>
-      </dl>
     </Card>
   );
 };

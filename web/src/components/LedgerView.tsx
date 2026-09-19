@@ -4,10 +4,10 @@ import { accountLabel, entryLabel, formatMinor, formatSignedMinor, formatTime } 
 import type { AccountBalance, JournalEntry } from '../types.ts';
 
 const KIND_TONE: Record<string, string> = {
-  deposit: 'text-accent',
+  deposit: 'text-accent-text',
   bet_lock: 'text-pending',
   round_resolved: 'text-fairness',
-  bet_settle: 'text-accent',
+  bet_settle: 'text-accent-text',
   commission: 'text-fairness',
   withdrawal: 'text-muted',
 };
@@ -40,7 +40,7 @@ const EntryRow = ({ entry, isNew }: { entry: JournalEntry; isNew: boolean }) => 
         <span className="mono ml-auto shrink-0 text-xs text-muted">
           {formatTime(entry.createdAt)}
         </span>
-        <span className={`mono shrink-0 text-xs ${sum === 0 ? 'text-accent' : 'text-refusal'}`}>
+        <span className={`mono shrink-0 text-xs ${sum === 0 ? 'text-accent-text' : 'text-refusal'}`}>
           Σ {sum}
         </span>
       </button>
@@ -57,12 +57,12 @@ const EntryRow = ({ entry, isNew }: { entry: JournalEntry; isNew: boolean }) => 
           <tbody>
             {entry.postings.map((p, i) => (
               <tr key={`${p.account}-${i}`}>
-                <td className="py-0.5 pl-12 text-muted">
-                  {accountLabel(p.account)} <span className="mono">({p.account})</span>
+                <td className="py-0.5 pl-12 text-muted" title={p.account}>
+                  {accountLabel(p.account)}
                 </td>
                 <td
                   className={`mono py-0.5 text-right ${
-                    p.amountMinor < 0 ? 'text-refusal' : 'text-accent'
+                    p.amountMinor < 0 ? 'text-refusal' : 'text-accent-text'
                   }`}
                 >
                   {formatSignedMinor(p.amountMinor)}
@@ -131,10 +131,9 @@ export const LedgerView = ({
           </thead>
           <tbody>
             {(accounts ?? []).map((a) => (
-              <tr key={a.accountId} className="border-b border-line/50 last:border-0">
-                <td className="py-2">
-                  <span className="block">{accountLabel(a.accountId)}</span>
-                  <span className="mono text-xs text-muted">{a.accountId}</span>
+              <tr key={a.accountId} className="border-b border-line last:border-0">
+                <td className="py-2" title={a.accountId}>
+                  {accountLabel(a.accountId)}
                 </td>
                 <td className="py-2 text-xs text-muted">{a.kind}</td>
                 <td className="mono py-2 text-right">{formatMinor(a.balanceMinor)}</td>

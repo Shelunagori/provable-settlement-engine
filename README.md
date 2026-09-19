@@ -31,16 +31,21 @@ Each step calls the live API; the interface decides nothing.
 | Time | Do this | What it proves |
 |---|---|---|
 | 0–10s | Read the hero and the live proof rail | `Σ postings = 0` is a live database check, not a constant |
-| 10–20s | **Add 10.00 funds** | One journal entry, two postings, balance moves, Σ still 0 |
-| 20–32s | **Place the outcome** | Roll, win/loss, payout, both entry ids, seed hash, nonce |
-| 32–42s | **Retire the seed and reveal it** | The browser recomputes `SHA256(seed)` and confirms the commitment |
-| 42–50s | **Recompute in this browser** | `crypto.subtle` reproduces the roll the server recorded |
-| 50–55s | **Attempt to write a balance** | `404 NO_SUCH_ENDPOINT` — there is nothing to write |
-| 55–60s | Advanced proofs → **Send the same payment 20 times** | 20 real HTTP deliveries → **1 posted, 19 deduplicated**, one entry |
+| 10–20s | **Add 10.00** | One journal entry, two postings, balance moves, Σ still 0 |
+| 20–32s | **Run demo** | Roll, win/loss, payout, both entry ids, seed hash, nonce |
+| 32–42s | **Reveal commitment** | The browser recomputes `SHA256(seed)` and confirms the commitment |
+| 42–50s | **Verify in browser** | `crypto.subtle` reproduces the roll the server recorded |
+| 50–55s | **Attempt balance write** | `404 NO_SUCH_ENDPOINT` — there is nothing to write |
+| 55–60s | Advanced proofs → **Run duplicate test** | 20 real HTTP deliveries → **1 posted, 19 deduplicated**, one entry |
 
 Under *Advanced proofs* the same system is available without the guided path:
-the raw ledger and journal, the duplicate-payment storm, every refusal code the
-server enforces, revealed seed history and affiliate accrual.
+the raw ledger and journal (*Ledger*), the duplicate-payment storm (*Duplicate
+protection*), every refusal code the server enforces (*Server rules*), revealed
+seed history (*Fairness*) and affiliate accrual (*Affiliate*).
+
+The console is light by default and offers Light / Dark / System, remembered in
+`localStorage`. There is no endpoint that stores a theme, and adding one would
+mean the interface holding state the server does not know about.
 
 ## Architecture
 
