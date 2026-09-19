@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --c-bg: #0b0d10;
+  --c-surface: #12151a;
+  --c-border: #1f242c;
+  --c-text: #e6e8eb;
+  --c-muted: #8b93a1;
+  --c-accent: #3ddc97;
+  --c-refusal: #ff6b6b;
+  --c-pending: #f5b84a;
+  --c-fairness: #7aa2f7;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --c-bg: #f7f8fa;
+    --c-surface: #ffffff;
+    --c-border: #e2e5ea;
+    --c-text: #14171c;
+    --c-muted: #5f6775;
+    --c-accent: #12925f;
+    --c-refusal: #c73434;
+    --c-pending: #9a6b00;
+    --c-fairness: #2f5bbd;
+    color-scheme: light;
+  }
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Every number, hash, account id and code renders in tabular mono. */
+.num {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

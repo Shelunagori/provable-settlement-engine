@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: pse-postgres
+    environment:
+      POSTGRES_USER: pse
+      POSTGRES_PASSWORD: pse
+      POSTGRES_DB: pse
+    ports:
+      - "5432:5432"
+    volumes:
+      - pse-pgdata:/var/lib/postgresql/data
+      - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pse -d pse"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pse-pgdata:
