@@ -1,0 +1,31 @@
+{
+  "encoding": {
+    "serverSeed": "32 cryptographically random bytes rendered as 64 lowercase hex characters",
+    "hashedValue": "the UTF-8 bytes of that 64-character hex string, NOT the 32 bytes it encodes",
+    "seedHash": "SHA256(UTF8(serverSeedText))",
+    "message": "`${clientSeed}:${nonce}`",
+    "hmac": "HMAC_SHA256(key = UTF8(serverSeedText), message = UTF8(message))",
+    "roll": "first 8 hex characters of the HMAC -> unsigned integer -> % 10000 -> hundredths (0..9999)",
+    "win": "rollHundredths < targetUnderHundredths, strictly less than",
+    "note": "Every runtime that verifies an outcome must use this exact representation. Treating the server seed as 32 binary bytes instead of its 64-character text produces a completely different digest."
+  },
+  "vectors": [
+    {
+      "name": "fixed-vector-1",
+      "serverSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "serverSeedHash": "6c86c6aac5fb24bcf5d9939cb7d7d5645ce39418f449e03b262dd4fa14b4b92b",
+      "clientSeed": "client-seed-001",
+      "nonce": "42",
+      "message": "client-seed-001:42",
+      "hmac": "78c3773bfac4aa2e0f580d3b2f8f8edabb205adc137ca9e819ad6e5bcfb79ace",
+      "first8": "78c3773b",
+      "integer": 2026075963,
+      "rollHundredths": 5963,
+      "roll": "59.63",
+      "boundary": [
+        { "targetUnder": "60.00", "targetUnderHundredths": 6000, "won": true },
+        { "targetUnder": "59.63", "targetUnderHundredths": 5963, "won": false }
+      ]
+    }
+  ]
+}

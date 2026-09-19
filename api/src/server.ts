@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import { config } from './config.js';
 import { closePool } from './db.js';
+import { ensureActiveSeed } from './fairness/seeds.js';
 import { runMigrations } from './migrate.js';
 import { isRefusal } from './refusals.js';
 import { registerRoutes } from './routes/index.js';
@@ -52,6 +53,11 @@ export const buildServer = async (): Promise<FastifyInstance> => {
   });
 
   await registerRoutes(app);
+
+  // Seed custody is part of building the service, not of one entrypoint, so
+  // the boot path under test is the boot path that runs in production. It
+  // reuses an existing active seed and never replaces one.
+  await ensureActiveSeed();
 
   return app;
 };

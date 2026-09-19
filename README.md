@@ -18,7 +18,7 @@ invariant gets the test that proves it.
 | Balance is derived; nothing can write it | `api/test/invariants/balance_is_derived.test.ts` | ✓ |
 | Duplicate payment events post exactly once, including concurrently | `api/test/invariants/exactly_once.test.ts` | ✓ |
 | A user account never goes negative under concurrency | `api/test/invariants/never_negative.test.ts` | |
-| Outcomes are reproducible from revealed seeds | `api/test/invariants/deterministic_outcome.test.ts` | |
+| Outcomes are reproducible from revealed seeds | `api/test/invariants/deterministic_outcome.test.ts` | ✓ |
 | Rounds move open → locked → resolved → settled, only | `api/test/invariants/lifecycle_is_linear.test.ts` | |
 
 ## Ledger
@@ -58,6 +58,32 @@ POST /demo/webhook-storm          -> { "sent": 20, "posted": 1, "deduplicated": 
 `/demo/webhook-storm` fires real concurrent HTTP at this server's own port and
 reports how many deliveries actually arrived, so the demonstration cannot
 quietly degrade into an in-process loop.
+
+## Seed custody and reproducible outcomes
+
+The service commits to a seed by publishing `SHA256` of it before the seed is
+ever used, and discloses the seed only on rotation. Anyone holding a revealed
+seed can recompute every outcome it produced.
+
+```
+seedHash = SHA256(UTF8(serverSeed))
+message  = `${clientSeed}:${nonce}`
+hmac     = HMAC_SHA256(key = UTF8(serverSeed), message = UTF8(message))
+roll     = (first 8 hex of hmac, as an integer) % 10000, in hundredths
+win      = rollHundredths < targetUnderHundredths      (strictly less than)
+```
+
+The server seed is 64 lowercase hex characters, and it is that *text* which is
+hashed and used as the HMAC key — not the 32 bytes it encodes. The two readings
+give different digests, so the contract and its test vector live in
+`fixtures/fairness-vectors.json` for every runtime that needs to agree.
+
+| Route | |
+|---|---|
+| `GET /fairness/seed` | the active commitment: `seedHash` and `nonce`, never the seed |
+| `POST /fairness/rotate` | reveals the current seed and installs its successor, in one transaction |
+| `GET /fairness/seeds` | revealed history, newest first, with the seeds to check hashes against |
+| `GET /fairness/verify` | recomputes an outcome; `matchesHash` is true only for a revealed commitment |
 
 ## Run locally
 

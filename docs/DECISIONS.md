@@ -289,3 +289,90 @@ Schema violations and an unknown or non-user `user_id` return 422 with
 decisions, so they deliberately do not claim a place in the refusal table. If
 the table later wants a code for "no such account", this is the call site to
 revisit.
+
+---
+
+## D22 — The server seed is hashed and keyed as text, not as the bytes it encodes
+
+A server seed is 32 random bytes rendered as 64 lowercase hex characters, and
+everything downstream operates on the UTF-8 bytes of those 64 characters:
+
+```
+seedText = randomBytes(32).toString('hex')
+seedHash = SHA256(UTF8(seedText))
+hmac     = HMAC_SHA256(key = UTF8(seedText), message = UTF8(`${clientSeed}:${nonce}`))
+```
+
+The alternative — hex-decoding back to 32 bytes and keying the HMAC with those
+— is equally defensible in isolation and produces a completely different
+digest. For the same fixed vector: `78c3773b…` with the text key, `fd9fa715…`
+with the decoded key.
+
+That difference is invisible inside any one runtime and fatal across two. A
+browser verifier that picks the other reading disagrees with the server on
+every outcome, and a verifier that disagrees with the server is worse than no
+verifier at all: it tells users the service is cheating when it is not. The
+contract is therefore pinned in `fixtures/fairness-vectors.json`, which the
+server tests consume today and the browser verifier will consume unchanged.
+
+---
+
+## D23 — The roll is integer hundredths until the last possible moment
+
+`rollHundredths` is an integer in 0..9999 and `targetUnderHundredths` likewise;
+the win comparison is between those integers. Decimal text is parsed to exact
+hundredths by string, not by `parseFloat`, and rendered back by string.
+
+`59.63` has no exact binary representation. `59.63 * 100` evaluates to
+`5962.999999999999`, which truncates to 5962 — one hundredth low, and enough to
+flip a boundary case from loss to win. The only floating-point value in the
+whole path is the `roll` field of the JSON response, produced at the
+serialisation boundary and never compared against anything.
+
+---
+
+## D24 — Exactly one active seed, decided by the database
+
+`ensureActiveSeed()` inserts a new seed with `ON CONFLICT DO NOTHING` and falls
+back to reading the existing commitment. The partial unique index from
+migration 001 (`WHERE status = 'active'`) is what makes the second inserter
+lose, so two service instances booting together cannot produce two active
+seeds. An in-memory "already initialised" flag would be per-process and would
+not survive a second instance.
+
+A restart never replaces an existing active seed. The hash published before a
+bet is placed has to remain the hash that bet is verified against; silently
+rotating on boot would break every outstanding commitment.
+
+Rotation reveals and replaces in one transaction, and in that order — the
+outgoing seed must stop being active before the incoming one can be inserted,
+or the partial index rejects it. So there is no instant with zero active seeds
+and none with two, and a failure anywhere leaves the old seed active and
+unrevealed, which is the safe direction to fail in.
+
+Seed initialisation happens in `buildServer()` rather than in the process
+entrypoint, so the boot path exercised by the tests is the boot path that runs
+in production.
+
+*Known limitation:* two simultaneous rotations serialise on the `FOR UPDATE`,
+and the loser finds no active row and errors rather than rotating the seed its
+rival just installed. The one-active invariant holds; only the error message is
+misleading. Rotation is an operator action, so this has not been designed
+around.
+
+---
+
+## D25 — `matchesHash` vouches only for revealed commitments
+
+`GET /fairness/verify` recomputes the outcome from whatever the caller supplies
+and always returns the roll: the arithmetic belongs to whoever holds the
+inputs. `matchesHash` answers the narrower question of whether this service
+published a commitment to that seed *and has since disclosed it*.
+
+An active seed returns `false` even though the service knows it perfectly well.
+Confirming it would amount to acknowledging a seed whose plaintext nobody
+outside the service should hold yet, which is the whole point of committing to
+a hash in advance.
+
+The endpoint takes no `seedHash` parameter; it derives the hash from the seed
+it was given and looks that up in revealed history.

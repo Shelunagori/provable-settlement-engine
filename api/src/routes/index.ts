@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { ping } from '../db.js';
 import { migrationStatus } from '../migrate.js';
 import { registerLedgerRoutes } from './ledger.js';
+import { registerFairnessRoutes } from './fairness.js';
 import { registerPaymentRoutes } from './payments.js';
 
 const bootedAt = Date.now();
@@ -26,4 +27,5 @@ export const registerRoutes = async (app: FastifyInstance): Promise<void> => {
 
   await registerLedgerRoutes(app);
   await registerPaymentRoutes(app);
+  await registerFairnessRoutes(app);
 };
