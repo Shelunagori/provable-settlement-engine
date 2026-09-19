@@ -119,8 +119,9 @@ bets that verify against the same HMAC — reproducible, but not distinct.
 
 No global state library. Everything rendered is derived from an API response,
 and every action refetches. The single piece of logic in the browser is
-`lib/verify.ts`, which recomputes outcomes locally — that one is the point, so
-it must not be able to fall back to trusting the server.
+[`web/src/fairness/verify.ts`](../web/src/fairness/verify.ts), which recomputes
+outcomes locally — that one is the point, so it must not be able to fall back to
+trusting the server.
 
 ---
 
@@ -312,8 +313,10 @@ That difference is invisible inside any one runtime and fatal across two. A
 browser verifier that picks the other reading disagrees with the server on
 every outcome, and a verifier that disagrees with the server is worse than no
 verifier at all: it tells users the service is cheating when it is not. The
-contract is therefore pinned in `fixtures/fairness-vectors.json`, which the
-server tests consume today and the browser verifier will consume unchanged.
+contract is therefore pinned in
+[`fixtures/fairness-vectors.json`](../fixtures/fairness-vectors.json), which the
+server tests, the browser verifier and the property oracle all consume
+unchanged.
 
 ---
 
@@ -354,11 +357,12 @@ Seed initialisation happens in `buildServer()` rather than in the process
 entrypoint, so the boot path exercised by the tests is the boot path that runs
 in production.
 
-*Known limitation:* two simultaneous rotations serialise on the `FOR UPDATE`,
-and the loser finds no active row and errors rather than rotating the seed its
-rival just installed. The one-active invariant holds; only the error message is
-misleading. Rotation is an operator action, so this has not been designed
-around.
+*Superseded.* This decision originally recorded a known limitation: two
+simultaneous rotations serialised on the `FOR UPDATE`, and the loser found no
+active row and errored rather than rotating the seed its rival had just
+installed. The one-active invariant held, but the error was misleading. D38
+replaced that behaviour with a fresh-statement retry, and a concurrency
+regression test now covers it.
 
 ---
 
@@ -465,8 +469,11 @@ it.
 ## D30 — One refusal table, generated rather than transcribed
 
 `api/src/refusals.ts` holds the nine official business refusals. `GET /refusals`
-serves that object, `docs/REFUSALS.md` is generated from it, and the tests
-assert against it. A hand-maintained markdown table next to a hand-maintained
+serves that object, the tests assert against it, and
+[`docs/REFUSALS.md`](REFUSALS.md) is genuinely generated from it by
+[`scripts/generate-refusals-doc.ts`](../scripts/generate-refusals-doc.ts):
+`npm run docs:refusals` writes the file and `npm run docs:check` fails the build
+when the committed copy has drifted. A hand-maintained markdown table next to a hand-maintained
 code table is two tables that will disagree, and the one people read is the one
 that will be wrong.
 
@@ -625,8 +632,8 @@ Postgres rechecks the locked tuple against `status = 'active'` and the seed it
 waited for is now revealed. That was reported as `No active seed to rotate`,
 which is misleading — nothing was wrong, it had simply lost a race.
 
-It now re-runs the select once, the same shape H4 already uses when allocating a
-nonce, and picks up the successor the winner installed. Two simultaneous
+It now re-runs the select once, the same shape nonce allocation already uses when
+taking the active seed, and picks up the successor the winner installed. Two simultaneous
 operator rotations therefore serialise into two legitimate rotations. Removing
 the retry turns the concurrency test red on every run.
 
@@ -639,7 +646,7 @@ The partial unique index remains the guard; nothing here is an application lock.
 React StrictMode runs effects twice in development. Cancelling the second
 caller's state update is not enough: both mounts still reach the network, both
 see 401, and both `POST /session` — one browser boot, two live session rows,
-observed in the H6 walkthrough as two 401s.
+observed in a browser walkthrough as two 401s.
 
 `web/src/auth/bootstrap.ts` coalesces simultaneous callers onto a single
 in-flight promise. A real dev browser boot now issues one `POST /session` and

@@ -44,6 +44,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Docs in sync with code
+        run: npm run docs:check
+
       - name: Test
         run: npm test
 

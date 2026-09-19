@@ -1,13 +1,15 @@
 # Refusal table
 
-A refusal is a deliberate, server-side "no" with a stable code. Every one is
-enforced where the decision can be trusted -- inside the transaction, under the
-relevant lock -- never in the client and never in a pre-flight check a later
-caller could skip.
+A refusal is a deliberate, server-side "no" with a stable code, as distinct from
+an unexpected error or a malformed request. Every one is enforced where the
+decision can be trusted — inside the transaction, under the relevant lock —
+never in the client and never in a pre-flight check a later caller could skip.
 
-This file is generated from `api/src/refusals.ts`, which is also what
-`GET /refusals` serves and what the tests assert against. There is one table,
-not three that can drift apart.
+**This file is generated from [`api/src/refusals.ts`](../api/src/refusals.ts).**
+Run `npm run docs:refusals` after changing the table; `npm run docs:check`
+fails if it has drifted. The same object is served by `GET /refusals` and
+asserted by [`api/test/refusals.test.ts`](../api/test/refusals.test.ts), so
+there is one contract rather than three that can disagree.
 
 Every refusal answers to the same shape:
 
@@ -33,5 +35,4 @@ Every refusal answers to the same shape:
 | `NOT_AUTHENTICATED` | 401 | No valid session: missing, malformed, unknown or expired. | auth/session.ts preHandler, against the sessions table |
 
 `INVALID_PAYLOAD`, `NO_SUCH_ROUND` and `INTERNAL_ERROR` are deliberately not
-in this table. They are transport-level answers about a request that never
-became a business decision.
+in this table. They answer a request that never became a business decision.

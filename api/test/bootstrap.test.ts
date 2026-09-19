@@ -1,12 +1,22 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import Fastify from 'fastify';
+import { healthHandler } from '../src/routes/index.js';
 import { buildServer } from '../src/server.js';
 import { closePool, getPool } from '../src/db.js';
 import { runMigrations, migrationStatus } from '../src/migrate.js';
-import { ensureMigrated } from './helpers.js';
+import { ensureMigrated, resetLedger } from './helpers.js';
 
 describe('H0 bootstrap', () => {
   beforeAll(async () => {
     await ensureMigrated();
+  });
+
+  beforeEach(async () => {
+    // This file asserts the exact seeded chart of accounts, so it must not
+    // inherit accounts another test file created. Without this the assertion
+    // passes or fails purely on which file vitest happens to run first -- it
+    // survived until a clean checkout with no test cache reordered the files.
+    await resetLedger();
   });
 
   afterAll(async () => {
@@ -63,6 +73,40 @@ describe('H0 bootstrap', () => {
       'postings_immutable',
       'rounds_linear',
     ]);
+  });
+
+  it('answers 503, not 200, when the database is unreachable', async () => {
+    // A body of {"ok": false} with HTTP 200 looks healthy to every load
+    // balancer there is, including the platform probe configured against this
+    // path. The status code is the part that has to be right.
+    const app = Fastify();
+    app.get(
+      '/health',
+      healthHandler({
+        ping: async () => {
+          throw new Error('connect ECONNREFUSED 10.0.0.1:5432');
+        },
+        migrationStatus: async () => [],
+      }),
+    );
+
+    const res = await app.inject({ method: 'GET', url: '/health' });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({ ok: false, db: false, migrations: [] });
+
+    // The failure must not leak the database's address or driver message.
+    expect(res.body).not.toContain('ECONNREFUSED');
+    expect(res.body).not.toContain('5432');
+    await app.close();
+  });
+
+  it('answers 503 when the database answers but reports not ready', async () => {
+    const app = Fastify();
+    app.get('/health', healthHandler({ ping: async () => false, migrationStatus: async () => [] }));
+    const res = await app.inject({ method: 'GET', url: '/health' });
+    expect(res.statusCode).toBe(503);
+    expect(res.json().ok).toBe(false);
+    await app.close();
   });
 
   it('serves /health with db and migration state', async () => {

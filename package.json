@@ -15,9 +15,12 @@
     "build": "npm -w api run build && npm -w web run build",
     "test": "npm -w api run test && npm -w web run test",
     "migrate": "npm -w api run migrate",
-    "typecheck": "npm -w api run typecheck && npm -w web run typecheck"
+    "typecheck": "npm -w api run typecheck && npm -w web run typecheck",
+    "docs:refusals": "tsx scripts/generate-refusals-doc.ts",
+    "docs:check": "tsx scripts/generate-refusals-doc.ts check"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "tsx": "^4.19.2"
   }
 }

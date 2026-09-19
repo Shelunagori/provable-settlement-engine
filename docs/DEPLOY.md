@@ -27,6 +27,11 @@ Two services: the API and its database on Railway, the console on Vercel.
 Migrations run automatically on boot and are idempotent, so a redeploy against
 an existing database applies nothing.
 
+`/health` answers `200` only when the database is reachable, and `503` when it
+is not, so the platform health check removes a broken instance from service
+instead of treating `{"ok": false}` with HTTP 200 as healthy. The failure
+response carries no database detail — the endpoint is unauthenticated.
+
 ## 2. Vercel — console
 
 1. **Add New → Project →** this repository.

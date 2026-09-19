@@ -323,6 +323,9 @@ ${JSON.stringify(balanceProof.body, null, 2)}`}
             Refusals
           </h3>
           <div className="flex flex-wrap gap-2">
+            <Button onClick={() => placeBet({ amountMinor: 99 })} busy={busy === 'bet'}>
+              Bet &lt; min
+            </Button>
             <Button onClick={() => placeBet({ amountMinor: 60_000 })} busy={busy === 'bet'}>
               Bet &gt; max
             </Button>
