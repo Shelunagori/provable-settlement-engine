@@ -124,3 +124,43 @@ export const activeSeedNonce = async (): Promise<bigint> => {
   );
   return rows[0]!.nonce;
 };
+
+/**
+ * Writes a balanced, already-settled losing bet pair directly, dated `daysAgo`.
+ *
+ * Test fixture only: it is how a test reaches a previous UTC day without
+ * mutating an immutable journal row, and how it sets up a starting daily loss
+ * without consuming nonces or depending on what the seed happens to roll.
+ *
+ * Both entries go in one transaction. Each pool.query commits on its own, so
+ * writing the legs separately would trip the deferred balance trigger on a
+ * half-written entry.
+ */
+export const insertSettledLoss = async (
+  userId: string,
+  amountMinor: bigint,
+  daysAgo = 0,
+): Promise<void> => {
+  const { withTx } = await import('../src/db.js');
+  const at = `now() - interval '${daysAgo} days'`;
+  await withTx(async (c) => {
+    const legsByKind = [
+      ['bet_lock', [[userId, -amountMinor], ['pending_bets', amountMinor]]],
+      ['bet_settle', [['pending_bets', -amountMinor], ['treasury', amountMinor]]],
+    ] as const;
+    for (const [kind, legs] of legsByKind) {
+      const { rows } = await c.query<{ id: bigint }>(
+        `INSERT INTO journal_entries (kind, ref_type, ref_id, created_at)
+         VALUES ($1, 'round', $2, ${at}) RETURNING id`,
+        [kind, `fixture_${userId}_${daysAgo}_${amountMinor}`],
+      );
+      for (const [account, amount] of legs) {
+        await c.query(
+          `INSERT INTO postings (entry_id, account_id, amount_minor, created_at)
+           VALUES ($1, $2, $3, ${at})`,
+          [rows[0]!.id.toString(), account, String(amount)],
+        );
+      }
+    }
+  });
+};

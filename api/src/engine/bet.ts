@@ -1,8 +1,15 @@
 import type { PoolClient } from '../db.js';
 import { getPool, withTx } from '../db.js';
+import { postCommission } from '../affiliate/commission.js';
 import { computeOutcome, formatHundredths, isWin } from '../fairness/outcome.js';
 import { postEntry } from '../ledger/post.js';
 import { RefusalError } from '../refusals.js';
+import {
+  DAILY_LOSS_LIMIT_MINOR,
+  MAX_BET_MINOR,
+  MIN_BET_MINOR,
+  dailyNetMinorTx,
+} from './limits.js';
 import {
   createRound,
   lockRound,
@@ -17,6 +24,8 @@ export type PlaceBetInput = {
   amountMinor: bigint;
   targetUnderHundredths: number;
   clientSeed: string;
+  /** Optional commitment the caller believes is active. Checked under its lock. */
+  seedHash?: string;
 };
 
 export type PlacedBet = {
@@ -54,6 +63,11 @@ export type BetRow = {
 const ESCROW = 'pending_bets';
 const TREASURY = 'treasury';
 
+// Advisory locks are keyed by (namespace, hash). Two namespaces keep a bet id
+// and a user id from ever hashing onto the same key and serialising each other.
+const LOCK_NS_BET_ID = 1;
+const LOCK_NS_DAILY_LOSS = 2;
+
 /**
  * Payout at a 1% margin: multiplier = 99 / targetUnder, truncated to minor units.
  *
@@ -81,7 +95,7 @@ export const payoutFor = (amountMinor: bigint, targetUnderHundredths: number): b
  * error, it is a lost race, so it is retried once against the seed the
  * rotation installed.
  */
-const allocateNonce = async (
+const lockActiveSeed = async (
   client: PoolClient,
 ): Promise<{ id: bigint; seed: string; seedHash: string; nonce: bigint }> => {
   const select = () =>
@@ -99,11 +113,14 @@ const allocateNonce = async (
     throw new Error('No active seed: cannot allocate a nonce');
   }
 
-  await client.query('UPDATE server_seeds SET nonce = nonce + 1 WHERE id = $1', [
-    active.id.toString(),
-  ]);
-
   return { id: active.id, seed: active.seed, seedHash: active.seed_hash, nonce: active.nonce };
+};
+
+/** Consumes the nonce the locked seed is offering. */
+const consumeNonce = async (client: PoolClient, seedId: bigint): Promise<void> => {
+  await client.query('UPDATE server_seeds SET nonce = nonce + 1 WHERE id = $1', [
+    seedId.toString(),
+  ]);
 };
 
 const loadBet = async (client: PoolClient, betId: string): Promise<PlacedBet | null> => {
@@ -170,7 +187,10 @@ export const placeBet = async (input: PlaceBetInput): Promise<PlacedBet> =>
     // concurrent deliveries of one bet id would otherwise both find no row and
     // both proceed; the primary key would stop the second from persisting, but
     // only after it had consumed a nonce and moved money.
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [betId]);
+    await client.query('SELECT pg_advisory_xact_lock($1, hashtext($2))', [
+      LOCK_NS_BET_ID,
+      betId,
+    ]);
 
     const existing = await loadBet(client, betId);
     if (existing) {
@@ -192,6 +212,56 @@ export const placeBet = async (input: PlaceBetInput): Promise<PlacedBet> =>
       });
     }
 
+    // Stake limits, before anything is written. These live here rather than in
+    // the route so a future caller of placeBet() gets the same business rules.
+    if (amountMinor < MIN_BET_MINOR) {
+      throw new RefusalError(
+        'BET_BELOW_MIN',
+        `Bet ${amountMinor} is below the minimum ${MIN_BET_MINOR}`,
+        { limit: Number(MIN_BET_MINOR), requestedAmount: Number(amountMinor) },
+      );
+    }
+    if (amountMinor > MAX_BET_MINOR) {
+      throw new RefusalError(
+        'BET_ABOVE_MAX',
+        `Bet ${amountMinor} exceeds max ${MAX_BET_MINOR}`,
+        { limit: Number(MAX_BET_MINOR), requestedAmount: Number(amountMinor) },
+      );
+    }
+
+    // Serialise this user's limit decision. Without it two requests can read
+    // the same remaining allowance and both pass it; the lock is held to
+    // commit, so the second reads a figure that already includes the first.
+    await client.query('SELECT pg_advisory_xact_lock($1, hashtext($2))', [
+      LOCK_NS_DAILY_LOSS,
+      userId,
+    ]);
+
+    const netToday = await dailyNetMinorTx(client, userId);
+    const netLossToday = -netToday;
+    if (netLossToday + amountMinor > DAILY_LOSS_LIMIT_MINOR) {
+      throw new RefusalError(
+        'DAILY_LOSS_LIMIT',
+        `Today's net loss ${netLossToday} plus ${amountMinor} exceeds the limit ${DAILY_LOSS_LIMIT_MINOR}`,
+        {
+          limit: Number(DAILY_LOSS_LIMIT_MINOR),
+          netLossToday: Number(netLossToday),
+          requestedAmount: Number(amountMinor),
+        },
+      );
+    }
+
+    // Take the seed lock before the round exists, so a caller betting against a
+    // commitment that has since rotated is refused before the nonce moves.
+    const seed = await lockActiveSeed(client);
+    if (input.seedHash !== undefined && input.seedHash !== seed.seedHash) {
+      throw new RefusalError(
+        'SEED_ROTATED',
+        'The supplied commitment is no longer the active seed',
+        { suppliedSeedHash: input.seedHash, activeSeedHash: seed.seedHash },
+      );
+    }
+
     const targetUnder = formatHundredths(targetUnderHundredths);
 
     const roundId = await createRound(client, userId);
@@ -202,7 +272,7 @@ export const placeBet = async (input: PlaceBetInput): Promise<PlacedBet> =>
       [betId, roundId, userId, amountMinor.toString(), targetUnder, clientSeed],
     );
 
-    const seed = await allocateNonce(client);
+    await consumeNonce(client, seed.id);
 
     // open -> locked, and the stake moves into escrow. INSUFFICIENT_FUNDS is
     // raised by postEntry here, before anything else happens.
@@ -254,6 +324,9 @@ export const placeBet = async (input: PlaceBetInput): Promise<PlacedBet> =>
       refId: roundId,
       postings: settlePostings,
     });
+
+    // Commission on what the treasury actually took, in this same transaction.
+    await postCommission(client, roundId, userId, won ? 0n : amountMinor);
 
     await settleRound(client, roundId);
 

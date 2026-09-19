@@ -17,7 +17,7 @@ invariant gets the test that proves it.
 | Σ postings = 0, enforced by the database | `api/test/invariants/sum_is_zero.test.ts` | ✓ |
 | Balance is derived; nothing can write it | `api/test/invariants/balance_is_derived.test.ts` | ✓ |
 | Duplicate payment events post exactly once, including concurrently | `api/test/invariants/exactly_once.test.ts` | ✓ |
-| A user account never goes negative under concurrency | `api/test/invariants/never_negative.test.ts` | |
+| A user account never goes negative under concurrency | `api/test/invariants/never_negative.test.ts` | ✓ |
 | Outcomes are reproducible from revealed seeds | `api/test/invariants/deterministic_outcome.test.ts` | ✓ |
 | Rounds move open → locked → resolved → settled, only | `api/test/invariants/lifecycle_is_linear.test.ts` | ✓ |
 
@@ -103,6 +103,25 @@ integers.
 | `POST /bets` | places one bet end to end; a repeated `betId` is refused with the original outcome |
 | `GET /bets?limit=20` | persisted bets, newest first, with the seed hash each was drawn against |
 | `GET /rounds/:id` | the round and the steps it actually took, ordered by journal id |
+
+## Refusals, limits and sessions
+
+Nine business refusals, each enforced inside the transaction under the relevant
+lock. The table lives in `api/src/refusals.ts`; `GET /refusals` serves it and
+[docs/REFUSALS.md](docs/REFUSALS.md) is generated from it.
+
+Stakes are bounded to 100–50000 minor units, and a user's net loss for the
+current UTC day is capped at 200000. That decision is serialised per user by an
+advisory lock, so two simultaneous stakes cannot both spend the same remaining
+allowance.
+
+`POST /session` is the demo login. The raw token is returned once in a signed
+`HttpOnly` cookie and stored only as SHA256, so a database dump yields no usable
+tokens. `POST /bets` and `GET /me` require it.
+
+A losing bet pays the referring affiliate 1% of the treasury's take as its own
+`commission` entry, in the same transaction as the settlement — visible at
+`GET /affiliate/:id`, derived from postings rather than stored.
 
 ## Run locally
 

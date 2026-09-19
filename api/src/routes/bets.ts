@@ -4,13 +4,11 @@ import { listBets, placeBet } from '../engine/bet.js';
 import { getRoundWithHistory } from '../engine/round.js';
 import { parseHundredths } from '../fairness/outcome.js';
 import { jsonSafe } from '../json.js';
+import { requireSession } from '../auth/session.js';
 import { RefusalError } from '../refusals.js';
 
 const TARGET_MIN_HUNDREDTHS = 100; // 1.00
 const TARGET_MAX_HUNDREDTHS = 9800; // 98.00
-
-/** Until authentication exists, every demo bet belongs to this account. */
-const DEMO_USER = 'user:demo';
 
 const placeBetSchema = z.object({
   betId: z.string().min(1).max(200),
@@ -19,6 +17,12 @@ const placeBetSchema = z.object({
   // JSON.stringify(60.00) is "60", and a float can never represent 59.63.
   targetUnder: z.union([z.number(), z.string()]).transform((v) => String(v)),
   clientSeed: z.string().min(1).max(256),
+  // Optional: the commitment the caller believes is active. Omitting it keeps
+  // pre-session callers working unchanged.
+  seedHash: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/, 'must be 64 lowercase hex characters')
+    .optional(),
 });
 
 const betsQuery = z.object({
@@ -32,7 +36,7 @@ const invalidPayload = (message: string) => ({
 });
 
 export const registerBetRoutes = async (app: FastifyInstance): Promise<void> => {
-  app.post('/bets', async (req, reply) => {
+  app.post('/bets', { preHandler: requireSession }, async (req, reply) => {
     const parsed = placeBetSchema.safeParse(req.body);
     if (!parsed.success) {
       const first = parsed.error.issues[0];
@@ -65,10 +69,11 @@ export const registerBetRoutes = async (app: FastifyInstance): Promise<void> => 
 
     const placed = await placeBet({
       betId: p.betId,
-      userId: DEMO_USER,
+      userId: req.userId!,
       amountMinor: BigInt(p.amountMinor),
       targetUnderHundredths,
       clientSeed: p.clientSeed,
+      ...(p.seedHash === undefined ? {} : { seedHash: p.seedHash }),
     });
 
     return reply.status(200).send(

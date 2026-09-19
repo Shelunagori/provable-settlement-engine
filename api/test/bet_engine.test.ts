@@ -130,7 +130,11 @@ describe('bet engine', () => {
       ['treasury', 500n],
     ]);
     expect(await getBalance('user:demo')).toBe(before - 500n);
-    expect(await getBalance('treasury')).toBe(500n);
+    // The treasury took 500 and paid 5 of it to the referring affiliate, so its
+    // balance is the take net of commission. The settlement entry above is
+    // unchanged; the commission is its own entry.
+    expect(await getBalance('treasury')).toBe(495n);
+    expect(await getBalance('affiliate:alice')).toBe(5n);
   });
 
   it('does not consume a nonce when the bet fails', async () => {

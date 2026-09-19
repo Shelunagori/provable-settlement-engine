@@ -4,6 +4,8 @@ import { migrationStatus } from '../migrate.js';
 import { registerLedgerRoutes } from './ledger.js';
 import { registerBetRoutes } from './bets.js';
 import { registerFairnessRoutes } from './fairness.js';
+import { registerMetaRoutes } from './meta.js';
+import { registerSessionRoutes } from './session.js';
 import { registerPaymentRoutes } from './payments.js';
 
 const bootedAt = Date.now();
@@ -30,4 +32,6 @@ export const registerRoutes = async (app: FastifyInstance): Promise<void> => {
   await registerPaymentRoutes(app);
   await registerFairnessRoutes(app);
   await registerBetRoutes(app);
+  await registerSessionRoutes(app);
+  await registerMetaRoutes(app);
 };

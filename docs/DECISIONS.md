@@ -459,3 +459,84 @@ and the payout. When the payout happens to equal the stake — possible at a
 target near 98.00 for a tiny stake — that leg is zero, and a posting of zero is
 not a movement, so it is dropped rather than offered to a schema that rejects
 it.
+
+---
+
+## D30 — One refusal table, generated rather than transcribed
+
+`api/src/refusals.ts` holds the nine official business refusals. `GET /refusals`
+serves that object, `docs/REFUSALS.md` is generated from it, and the tests
+assert against it. A hand-maintained markdown table next to a hand-maintained
+code table is two tables that will disagree, and the one people read is the one
+that will be wrong.
+
+`INVALID_PAYLOAD`, `NO_SUCH_ROUND` and `INTERNAL_ERROR` are deliberately not in
+it. They answer a request that never became a business decision, and putting
+them in the table would blur what a refusal is.
+
+---
+
+## D31 — Daily loss is UTC, bet-only, and not clamped
+
+The figure is the sum of the user's own postings on `bet_lock` and `bet_settle`
+entries in the current UTC day. Deposits, withdrawals and affiliate commission
+are excluded: none of them is the user losing at the table, and counting a
+deposit as a gain would hand back allowance the user never earned.
+
+The day boundary is `date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE
+'UTC'` in SQL, so it does not move with the database's or session's timezone.
+Changing it to a rolling window turns the previous-day test red.
+
+The value is deliberately not clamped at zero. A user who is up on the day
+legitimately has more headroom than one who is level, and clamping would quietly
+take that away.
+
+---
+
+## D32 — The limit decision is serialised per user by an advisory lock
+
+`placeBet()` takes `pg_advisory_xact_lock(2, hashtext(userId))` before reading
+the daily figure, and holds it to commit. Without it two requests read the same
+remaining allowance and both pass: 150000 + 50000 twice is 250000 against a
+limit of 200000. Removing the lock turns the race test red on every run.
+
+Advisory locks are keyed by (namespace, hash), and two namespaces are used so a
+bet id and a user id can never hash onto the same key and serialise each other
+by accident. A hash collision within a namespace over-serialises unrelated
+users, which is slower but never wrong; under-protecting one user would be.
+
+---
+
+## D33 — Session tokens are stored only as SHA256
+
+`POST /session` generates 32 bytes from the OS CSPRNG, returns the raw token
+once in a signed `HttpOnly` cookie, and stores only `SHA256(token)`. A database
+dump therefore yields no usable bearer tokens.
+
+Missing, malformed, badly signed, unknown and expired sessions all return the
+same `NOT_AUTHENTICATED`. Distinguishing them tells someone probing which half
+of a guess was right.
+
+The cookie is `SameSite=None; Secure` in production, because the console is
+served from a different origin; browsers only accept `None` together with
+`Secure`, which requires HTTPS. Local development is plain HTTP, so it gets
+`Lax` — `None; Secure` there would simply never be stored. The option object is
+built by a function taking the environment as an argument, so the difference is
+testable without booting a second server.
+
+---
+
+## D34 — Commission is 1% of the treasury's take, inside the bet transaction
+
+A losing bet hands the stake to the treasury; the referring affiliate is paid
+1% of that, floored, as its own `commission` journal entry against the round.
+Nothing is paid on a win (the treasury took nothing), for a user with no
+referrer, or when 1% floors to zero.
+
+It runs inside the same transaction as the settlement. A second transaction
+would leave a settled round whose commission silently never happened — and in
+practice would not even get that far: the outer transaction still holds the
+treasury account's row lock, so a separate connection deadlocks against itself.
+
+The commission is not the user's money and is excluded from the daily-loss
+figure: a losing bet of 500 moves the user's daily net by -500, not -505.
