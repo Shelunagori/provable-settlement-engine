@@ -585,9 +585,9 @@ is no `/demo/refuse/*` endpoint and no state reset to manufacture an
 from the UI are shown in the refusal table, served by `GET /refusals`, with a
 note about what reaching them requires.
 
-The invariants strip states what each pill actually knows. The derived-balance
-pill describes the design and names the test that asserts it, rather than
-implying it inspected the schema live, and the webhook pill shows the figures
+Each proof card states what it actually knows. The derived-balance card
+describes the design and names the test that asserts it, rather than implying it
+inspected the schema live, and the payment-idempotency panel shows the figures
 the storm you ran returned rather than inventing cumulative statistics no
 endpoint reports.
 
@@ -657,3 +657,32 @@ The test mock answers from session state rather than call order. An earlier
 version counted calls, which let the second caller see "already signed in"
 merely because it ran second — it passed against an implementation that did not
 coalesce at all.
+
+---
+
+## D40 — The console leads with one path, and keeps every proof
+
+The first version of the console was three technical panels of equal weight:
+ledger, actions, fairness. Everything was reachable and nothing was first. A
+visitor who had not read the README could not tell what to click, and the
+interface read as an inspector for someone who already understood the system.
+
+The layout now states the claim, shows the balance, and then walks one path —
+add funds, place an outcome, watch the money move, reveal the commitment,
+recompute the result — with a live proof rail beside it so a claim and the
+action that exercises it are on screen together. Every panel the old console had
+is still present, under *Advanced proofs*: the raw ledger and journal, the
+webhook storm, the full refusal table, seed history and affiliate accrual.
+
+This is presentation only. No endpoint changed, no request shape changed, and
+the boundary in D36 is unchanged: the interface still decides nothing. The
+guided steps are the same API calls the old buttons made, and a refusal is still
+rendered as a named code with its structured detail rather than swallowed.
+
+Two constraints shaped the surface rather than the layout. Status is never
+carried by colour alone — every indicator ships with its label — and the palette
+is defined once as CSS custom properties with a light-mode remap, including a
+separate `--c-on-accent` so filled buttons stay legible in both schemes. Measured
+in a real browser after the full journey, in both colour schemes and with the
+refusal, table and drawer states open, no rendered text falls below its WCAG AA
+contrast threshold.

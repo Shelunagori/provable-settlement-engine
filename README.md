@@ -25,17 +25,22 @@ mutation that turns its test red — in **[docs/INVARIANTS.md](docs/INVARIANTS.m
 
 ## 60-second tour
 
-Run locally (below), open the console, and click straight down the Actions panel:
+Run locally (below), open the console, and follow the guided demo down the page.
+Each step calls the live API; the interface decides nothing.
 
 | Time | Do this | What it proves |
 |---|---|---|
-| 0–10s | Read the invariant strip | `Σ postings = 0 ✓` polls a live database check, not a constant |
-| 10–20s | **Deposit 10.00** | One journal entry, two postings, balance moves, Σ still 0 |
-| 20–30s | **Storm: same webhook ×20** | 20 real HTTP deliveries → **1 posted, 19 deduplicated**, one entry |
-| 30–38s | **Try PUT /balance** | `404 NO_SUCH_ENDPOINT` — there is nothing to write |
-| 38–48s | **Place bet** | Roll, win/loss, payout, both entry ids, seed hash, nonce |
-| 48–55s | **Rotate & reveal** | The browser recomputes `SHA256(seed)` and confirms the commitment |
-| 55–60s | **Verify last bet in browser** | `crypto.subtle` reproduces the roll the server recorded |
+| 0–10s | Read the hero and the live proof rail | `Σ postings = 0` is a live database check, not a constant |
+| 10–20s | **Add 10.00 funds** | One journal entry, two postings, balance moves, Σ still 0 |
+| 20–32s | **Place the outcome** | Roll, win/loss, payout, both entry ids, seed hash, nonce |
+| 32–42s | **Retire the seed and reveal it** | The browser recomputes `SHA256(seed)` and confirms the commitment |
+| 42–50s | **Recompute in this browser** | `crypto.subtle` reproduces the roll the server recorded |
+| 50–55s | **Attempt to write a balance** | `404 NO_SUCH_ENDPOINT` — there is nothing to write |
+| 55–60s | Advanced proofs → **Send the same payment 20 times** | 20 real HTTP deliveries → **1 posted, 19 deduplicated**, one entry |
+
+Under *Advanced proofs* the same system is available without the guided path:
+the raw ledger and journal, the duplicate-payment storm, every refusal code the
+server enforces, revealed seed history and affiliate accrual.
 
 ## Architecture
 
@@ -63,10 +68,11 @@ flowchart TD
 ```
 
 **PostgreSQL is the financial authority. The console is not.** The frontend
-formats values, sums the postings it was handed for a visible Σ badge, and
-verifies fairness cryptographically. It decides nothing: sufficiency of funds,
-limits, validity, payout, commission, nonce allocation, round transitions and
-idempotency are all server answers.
+formats values, sums the postings it was handed so the arithmetic is visible,
+and verifies fairness cryptographically. It decides nothing: sufficiency of
+funds, limits, validity, payout, commission, nonce allocation, round transitions
+and idempotency are all server answers. Its own state is one session cookie and
+the form fields you are typing into.
 
 ## Ledger design
 

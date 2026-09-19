@@ -1,21 +1,30 @@
 import { useCallback, useEffect, useState } from 'react';
 import { API_BASE, ApiError, api } from './api.ts';
 import { bootstrapSession } from './auth/bootstrap.ts';
-import { ActionsPanel } from './components/ActionsPanel.tsx';
-import { FairnessPanel } from './components/FairnessPanel.tsx';
-import { InvariantsStrip } from './components/InvariantsStrip.tsx';
-import { LedgerPanel } from './components/LedgerPanel.tsx';
+import { ActivityFeed } from './components/ActivityFeed.tsx';
+import { AdvancedProofs } from './components/AdvancedProofs.tsx';
+import { GuidedDemo } from './components/GuidedDemo.tsx';
+import { Hero } from './components/Hero.tsx';
+import { HowItWorks } from './components/HowItWorks.tsx';
+import { ProofRail } from './components/ProofRail.tsx';
+import { TopNav } from './components/TopNav.tsx';
+import { WalletCard } from './components/WalletCard.tsx';
 import { Toasts, type ToastMessage } from './components/Toast.tsx';
+import { ErrorState } from './components/ui.tsx';
 import { useApi } from './hooks/useApi.ts';
-import type { Me, StormResult } from './types.ts';
+import { useEngine } from './hooks/useEngine.ts';
+import type { Me } from './types.ts';
 
 type AuthState = 'checking' | 'ready' | 'failed';
+
+const scrollTo = (hash: string) => {
+  document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState>('checking');
   const [authError, setAuthError] = useState<string | null>(null);
   const [me, setMe] = useState<Me | null>(null);
-  const [storm, setStorm] = useState<StormResult | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const toast = useCallback((text: string) => {
@@ -64,142 +73,134 @@ export default function App() {
   const refusals = useApi(() => api.refusals(), []);
   const affiliate = useApi(() => api.affiliate('affiliate:alice'), []);
 
-  const refreshLedger = useCallback(() => {
-    void accounts.refresh();
-    void entries.refresh();
-    void invariants.refresh();
-    void loadMe().catch(() => undefined);
-  }, [accounts, entries, invariants, loadMe]);
-
   const onChanged = useCallback(
-    (what: 'deposit' | 'bet' | 'none') => {
-      if (what === 'none') return;
-      refreshLedger();
+    (what: 'deposit' | 'bet' | 'seed') => {
+      if (what === 'seed') {
+        void commitment.refresh();
+        void revealed.refresh();
+        return;
+      }
+      void accounts.refresh();
+      void entries.refresh();
+      void invariants.refresh();
+      void loadMe().catch(() => undefined);
       if (what === 'bet') {
         void bets.refresh();
         void commitment.refresh();
         void affiliate.refresh();
       }
     },
-    [refreshLedger, bets, commitment, affiliate],
+    [accounts, entries, invariants, loadMe, bets, commitment, affiliate, revealed],
   );
 
-  const onRotated = useCallback(() => {
-    void commitment.refresh();
-    void revealed.refresh();
-  }, [commitment, revealed]);
+  const engine = useEngine({ onChanged, toast });
 
   const apiUp = health.data?.ok === true;
   const lastBet = bets.data && bets.data.length > 0 ? bets.data[0]! : null;
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-line">
-        <div className="mx-auto max-w-console px-4 py-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="num text-base font-medium">ledgerproof</h1>
-              <p className="text-sm text-muted">
-                A settlement ledger that shows its work: balances derived, refusals server-side,
-                outcomes anyone can recompute.
-              </p>
-            </div>
-            <div
-              className="flex items-center gap-2 rounded-md border border-line px-3 py-1.5"
-              aria-live="polite"
-            >
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  health.loading ? 'bg-pending' : apiUp ? 'bg-accent' : 'bg-refusal'
-                }`}
-                aria-hidden="true"
-              />
-              <span className="num text-xs text-muted">
-                api{' '}
-                {health.loading
-                  ? 'checking'
-                  : apiUp
-                    ? `up · ${health.data?.migrations.length ?? 0} migrations`
-                    : 'unreachable'}
-              </span>
-            </div>
-          </div>
+      <a
+        href="#demo"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-raised focus:px-4 focus:py-2"
+      >
+        Skip to the demo
+      </a>
 
-          <div className="mt-3">
-            <InvariantsStrip
-              invariants={invariants.data}
-              commitment={commitment.data}
-              storm={storm}
-            />
-          </div>
-        </div>
-      </header>
+      <TopNav apiUp={apiUp} apiLoading={health.loading} me={me} />
 
-      <main className="mx-auto max-w-console px-4 py-6">
+      <main className="mx-auto max-w-console px-4 pb-20 sm:px-6">
         {auth === 'failed' && (
-          <div className="mb-4 rounded border border-refusal/40 px-3 py-3 text-sm">
-            <p className="font-medium text-refusal">Could not start a demo session.</p>
-            <p className="mt-1 text-muted">
-              {authError} · API at <span className="num">{API_BASE}</span>
-            </p>
+          <div className="mt-6">
+            <ErrorState
+              error={new Error(authError ?? 'Could not start a demo session.')}
+              base={API_BASE}
+            />
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          <div className="lg:col-span-5">
-            <LedgerPanel
+        <Hero
+          wallet={
+            <WalletCard
+              me={me}
               accounts={accounts.data}
+              loading={auth === 'checking'}
+              depositBusy={engine.busy === 'deposit'}
+              onDeposit={() => void engine.deposit(1000)}
+              onPlay={() => scrollTo('#demo')}
+            />
+          }
+        />
+
+        <div className="grid gap-10 pt-16 lg:grid-cols-12 lg:gap-8">
+          <div className="lg:col-span-8">
+            <GuidedDemo
+              engine={engine}
+              me={me}
+              commitment={commitment.data}
               entries={entries.data}
-              affiliate={affiliate.data}
-              loading={entries.loading}
-              error={accounts.error ?? entries.error}
-              apiBase={API_BASE}
+              lastBet={lastBet}
             />
           </div>
           <div className="lg:col-span-4">
-            <ActionsPanel
-              me={me}
+            <ProofRail
+              invariants={invariants.data}
+              invariantsLoading={invariants.loading}
               commitment={commitment.data}
-              refusals={refusals.data}
-              toast={toast}
-              onStorm={setStorm}
-              onChanged={onChanged}
-            />
-          </div>
-          <div className="lg:col-span-3">
-            <FairnessPanel
-              commitment={commitment.data}
-              revealed={revealed.data}
-              lastBet={lastBet}
-              onRotated={onRotated}
-              toast={toast}
+              verification={engine.verification}
+              balanceProbe={engine.balanceProbe}
+              onProbeBalance={() => void engine.probeBalanceWrite()}
+              probing={engine.busy === 'balance'}
             />
           </div>
         </div>
+
+        <ActivityFeed entries={entries.data} loading={entries.loading} />
+
+        <AdvancedProofs
+          engine={engine}
+          me={me}
+          accounts={accounts.data}
+          entries={entries.data}
+          entriesLoading={entries.loading}
+          entriesError={accounts.error ?? entries.error}
+          refusals={refusals.data}
+          revealed={revealed.data}
+          affiliate={affiliate.data}
+          apiBase={API_BASE}
+        />
+
+        <HowItWorks />
       </main>
 
-      <footer className="mx-auto max-w-console px-4 pb-10 text-xs text-muted">
-        <p>
-          Everything you see is derived from the ledger. The UI has no financial state of its own.
-        </p>
-        <p className="mt-1 flex flex-wrap gap-3">
-          <a className="underline hover:text-ink" href="https://github.com/Shelunagori/provable-settlement-engine#readme">
+      <footer className="border-t border-line">
+        <div className="mx-auto flex max-w-console flex-wrap items-center gap-x-6 gap-y-2 px-4 py-8 text-xs text-muted sm:px-6">
+          <p>
+            Everything shown is derived from the ledger. The interface holds no financial state of
+            its own.
+          </p>
+          <span className="mono ml-auto">api {API_BASE}</span>
+        </div>
+        <div className="mx-auto flex max-w-console flex-wrap gap-4 px-4 pb-10 text-xs sm:px-6">
+          <a
+            className="text-muted underline underline-offset-2 hover:text-ink"
+            href="https://github.com/Shelunagori/provable-settlement-engine#readme"
+          >
             README
           </a>
           <a
-            className="underline hover:text-ink"
+            className="text-muted underline underline-offset-2 hover:text-ink"
             href="https://github.com/Shelunagori/provable-settlement-engine/blob/main/docs/REFUSALS.md"
           >
-            docs/REFUSALS.md
+            Refusal codes
           </a>
           <a
-            className="underline hover:text-ink"
+            className="text-muted underline underline-offset-2 hover:text-ink"
             href="https://github.com/Shelunagori/provable-settlement-engine/blob/main/docs/DECISIONS.md"
           >
-            docs/DECISIONS.md
+            Design decisions
           </a>
-          <span className="num">api {API_BASE}</span>
-        </p>
+        </div>
       </footer>
 
       <Toasts toasts={toasts} dismiss={dismiss} />
