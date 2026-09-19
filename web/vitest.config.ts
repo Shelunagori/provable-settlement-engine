@@ -1,10 +1,13 @@
 import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  plugins: [react()],
   test: {
-    // Node 20+ exposes Web Crypto globally, so the verifier runs unchanged here
-    // and in the browser. No DOM environment is needed for it.
+    // Most of these tests are pure -- the verifier runs unchanged in Node 20+
+    // because Web Crypto is global there. The routing tests render components,
+    // so they ask for jsdom per file with an environment docblock.
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },
 });

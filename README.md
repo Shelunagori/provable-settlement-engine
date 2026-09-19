@@ -4,10 +4,28 @@ A server-authoritative money core whose invariants are tested, not assumed.
 
 [![ci](https://github.com/Shelunagori/provable-settlement-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/Shelunagori/provable-settlement-engine/actions/workflows/ci.yml)
 
-A double-entry ledger where no balance is ever stored, payment ingestion that is
+A wagering proof of concept where a user funds a demo wallet, stakes credits on
+a target and receives a server-settled win or loss. Behind that flow: a
+double-entry ledger where no balance is ever stored, payment ingestion that is
 idempotent under concurrent duplicate delivery, settlement outcomes anyone can
-recompute from published data, and an operator console that shows each of those
-holding rather than claiming it.
+recompute from published data, and a console that shows each of those holding
+rather than claiming it. The browser chooses what to ask for; the API and
+PostgreSQL decide what is true.
+
+## Live demo
+
+| | |
+|---|---|
+| Demo | <https://provable-settlement-engine-api.vercel.app> |
+| POC review | <https://provable-settlement-engine-api.vercel.app/review> |
+| API health | <https://pseapi-production.up.railway.app/health> |
+
+The review page explains the whole system to someone who has never seen it —
+what a bet is, where the money goes, why the balance cannot be edited, and what
+the POC does and does not claim. Start there if you have five minutes; start at
+the demo if you have one.
+
+Demo credits only: no real money, no payment provider, no custody.
 
 ## What this proves
 

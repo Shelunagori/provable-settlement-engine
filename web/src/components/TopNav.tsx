@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, Skeleton, StatusDot } from './ui.tsx';
 import { ThemeRow, ThemeToggle } from './ThemeToggle.tsx';
 import { CloseIcon, MenuIcon } from './icons.tsx';
+import { navigate } from '../routing.ts';
 import { formatMinor } from '../format.ts';
 import type { Theme } from '../theme.ts';
 import type { Me } from '../types.ts';
@@ -78,6 +79,12 @@ export const TopNav = ({
                 </a>
               </li>
             ))}
+            <li>
+              {/* A page, not an anchor: it leaves the console for /review. */}
+              <button type="button" className="hover:text-ink" onClick={() => navigate('/review')}>
+                Review POC
+              </button>
+            </li>
           </ul>
         </nav>
 
@@ -143,6 +150,18 @@ export const TopNav = ({
                   </a>
                 </li>
               ))}
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenu(false);
+                    navigate('/review');
+                  }}
+                  className="block w-full rounded-lg px-2 py-2 text-left hover:bg-subtle"
+                >
+                  Review POC
+                </button>
+              </li>
               {resetAvailable && (
                 <li>
                   <button

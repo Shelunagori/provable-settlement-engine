@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
+import Root from './Root.tsx';
 import { applyTheme, readTheme } from './theme.ts';
 import './index.css';
 
@@ -13,6 +13,6 @@ if (!root) throw new Error('#root not found');
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <Root />
   </StrictMode>,
 );

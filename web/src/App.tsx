@@ -15,7 +15,8 @@ import { Toasts, type ToastMessage } from './components/Toast.tsx';
 import { ErrorState } from './components/ui.tsx';
 import { useApi } from './hooks/useApi.ts';
 import { useEngine } from './hooks/useEngine.ts';
-import { applyTheme, readTheme, storeTheme, type Theme } from './theme.ts';
+import { navigate } from './routing.ts';
+import type { Theme } from './theme.ts';
 import type { Me } from './types.ts';
 
 type AuthState = 'checking' | 'ready' | 'failed';
@@ -24,12 +25,17 @@ const scrollTo = (hash: string) => {
   document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 
-export default function App() {
+export default function App({
+  theme,
+  setTheme,
+}: {
+  theme: Theme;
+  setTheme: (t: Theme) => void;
+}) {
   const [auth, setAuth] = useState<AuthState>('checking');
   const [authError, setAuthError] = useState<string | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [theme, setThemeState] = useState<Theme>(() => readTheme());
   const [resetOpen, setResetOpen] = useState(false);
 
   // Bet inputs live here so "place another bet" can return focus to them.
@@ -37,12 +43,6 @@ export default function App() {
   const [target, setTarget] = useState('50.00');
   const [clientSeed, setClientSeed] = useState<string>(() => crypto.randomUUID());
   const betRef = useRef<HTMLDivElement>(null);
-
-  const setTheme = useCallback((next: Theme) => {
-    setThemeState(next);
-    applyTheme(next);
-    storeTheme(next);
-  }, []);
 
   const toast = useCallback((text: string) => {
     setToasts((prev) => [...prev, { id: Date.now() + Math.random(), text }]);
@@ -250,6 +250,13 @@ export default function App() {
           <span className="mono ml-auto">{API_BASE}</span>
         </div>
         <div className="mx-auto flex max-w-console flex-wrap items-center gap-4 px-4 pb-8 text-xs sm:px-6">
+          <button
+            type="button"
+            onClick={() => navigate('/review')}
+            className="text-ink-2 underline underline-offset-2 hover:text-ink"
+          >
+            Review this POC
+          </button>
           <a
             className="text-ink-2 underline underline-offset-2 hover:text-ink"
             href="https://github.com/Shelunagori/provable-settlement-engine#readme"
