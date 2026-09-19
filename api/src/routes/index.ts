@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { ping } from '../db.js';
 import { migrationStatus } from '../migrate.js';
 import { registerLedgerRoutes } from './ledger.js';
+import { registerBetRoutes } from './bets.js';
 import { registerFairnessRoutes } from './fairness.js';
 import { registerPaymentRoutes } from './payments.js';
 
@@ -28,4 +29,5 @@ export const registerRoutes = async (app: FastifyInstance): Promise<void> => {
   await registerLedgerRoutes(app);
   await registerPaymentRoutes(app);
   await registerFairnessRoutes(app);
+  await registerBetRoutes(app);
 };

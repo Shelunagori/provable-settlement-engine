@@ -19,13 +19,14 @@ describe('H0 bootstrap', () => {
       '001_schema.sql',
       '002_triggers.sql',
       '003_seed_data.sql',
+      '004_round_lifecycle.sql',
     ]);
   });
 
   it('is idempotent: a second run applies nothing', async () => {
     const { applied, skipped } = await runMigrations();
     expect(applied).toEqual([]);
-    expect(skipped).toHaveLength(3);
+    expect(skipped).toHaveLength(4);
   });
 
   it('seeds the chart of accounts', async () => {
@@ -39,6 +40,14 @@ describe('H0 bootstrap', () => {
       { id: 'treasury', kind: 'treasury' },
       { id: 'user:demo', kind: 'user' },
     ]);
+  });
+
+  it('allows the round_resolved lifecycle kind', async () => {
+    const { rows } = await getPool().query<{ def: string }>(
+      `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+       WHERE conrelid = 'journal_entries'::regclass AND conname = 'journal_entries_kind_check'`,
+    );
+    expect(rows[0]!.def).toContain('round_resolved');
   });
 
   it('installs the ledger triggers', async () => {

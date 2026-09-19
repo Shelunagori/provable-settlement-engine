@@ -19,7 +19,7 @@ invariant gets the test that proves it.
 | Duplicate payment events post exactly once, including concurrently | `api/test/invariants/exactly_once.test.ts` | ✓ |
 | A user account never goes negative under concurrency | `api/test/invariants/never_negative.test.ts` | |
 | Outcomes are reproducible from revealed seeds | `api/test/invariants/deterministic_outcome.test.ts` | ✓ |
-| Rounds move open → locked → resolved → settled, only | `api/test/invariants/lifecycle_is_linear.test.ts` | |
+| Rounds move open → locked → resolved → settled, only | `api/test/invariants/lifecycle_is_linear.test.ts` | ✓ |
 
 ## Ledger
 
@@ -84,6 +84,25 @@ give different digests, so the contract and its test vector live in
 | `POST /fairness/rotate` | reveals the current seed and installs its successor, in one transaction |
 | `GET /fairness/seeds` | revealed history, newest first, with the seeds to check hashes against |
 | `GET /fairness/verify` | recomputes an outcome; `matchesHash` is true only for a revealed commitment |
+
+## Rounds and settlement
+
+A bet owns one round and drives it `open → locked → resolved → settled` inside a
+single transaction. Each step is recorded as a journal entry rather than
+inferred from the round's current status, and each transition is asserted by the
+service under a row lock *and* enforced by a database trigger.
+
+The nonce is allocated under the active seed's row lock and incremented in the
+same transaction as the bet, so a failed bet returns its nonce to the sequence
+and two concurrent bets can never share one. Payout is
+`floor(amountMinor × 9900 / targetUnderHundredths)`, computed entirely in
+integers.
+
+| Route | |
+|---|---|
+| `POST /bets` | places one bet end to end; a repeated `betId` is refused with the original outcome |
+| `GET /bets?limit=20` | persisted bets, newest first, with the seed hash each was drawn against |
+| `GET /rounds/:id` | the round and the steps it actually took, ordered by journal id |
 
 ## Run locally
 

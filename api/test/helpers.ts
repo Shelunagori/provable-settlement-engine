@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { getPool } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
 
@@ -73,4 +74,53 @@ export const warmPool = async (n = 12): Promise<void> => {
   const pool = getPool();
   const clients = await Promise.all(Array.from({ length: n }, () => pool.connect()));
   for (const c of clients) c.release();
+};
+
+/**
+ * Replaces whatever active seed exists with a known one, so a test can assert a
+ * fixed roll. The seed text is the shared fixture's, which is the same value
+ * the browser verifier will be checked against.
+ */
+export const useFixtureSeed = async (
+  seed: string,
+  nonce = 0,
+): Promise<{ id: bigint; seedHash: string }> => {
+  const pool = getPool();
+  await pool.query("DELETE FROM server_seeds WHERE status = 'active'");
+  const seedHash = createHash('sha256').update(Buffer.from(seed, 'utf8')).digest('hex');
+  const { rows } = await pool.query<{ id: bigint }>(
+    `INSERT INTO server_seeds (seed, seed_hash, status, nonce)
+     VALUES ($1, $2, 'active', $3) RETURNING id`,
+    [seed, seedHash, nonce],
+  );
+  return { id: rows[0]!.id, seedHash };
+};
+
+/** Credits a user account straight through the ledger, for test setup. */
+export const fundUser = async (userId: string, amountMinor: bigint): Promise<void> => {
+  const pool = getPool();
+  await pool.query(
+    "INSERT INTO accounts (id, kind) VALUES ($1, 'user') ON CONFLICT DO NOTHING",
+    [userId],
+  );
+  const { postEntry } = await import('../src/ledger/post.js');
+  const { withTx } = await import('../src/db.js');
+  await withTx((c) =>
+    postEntry(c, {
+      kind: 'deposit',
+      refType: 'webhook_event',
+      refId: `fund_${userId}_${amountMinor}_${Math.random().toString(36).slice(2)}`,
+      postings: [
+        { account: 'gateway', amountMinor: -amountMinor },
+        { account: userId, amountMinor },
+      ],
+    }),
+  );
+};
+
+export const activeSeedNonce = async (): Promise<bigint> => {
+  const { rows } = await getPool().query<{ nonce: bigint }>(
+    "SELECT nonce FROM server_seeds WHERE status = 'active'",
+  );
+  return rows[0]!.nonce;
 };

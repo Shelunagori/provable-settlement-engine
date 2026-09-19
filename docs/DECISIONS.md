@@ -376,3 +376,86 @@ a hash in advance.
 
 The endpoint takes no `seedHash` parameter; it derives the hash from the seed
 it was given and looks that up in revealed history.
+
+---
+
+## D26 — `round_resolved` is a journal entry with no postings
+
+Two of the three lifecycle steps coincide with money moving: `bet_lock` marks
+open → locked, `bet_settle` marks resolved → settled. Computing an outcome
+moves nothing, so locked → resolved had no record at all, and `GET /rounds/:id`
+would have had to infer it from the round's current status — which is not
+history, it is a guess that happens to be right until something goes wrong.
+
+Migration 004 extends the `kind` CHECK with `round_resolved`, written as an
+entry carrying zero postings. That is not money movement, so `postEntry()`
+remains the only path by which money moves; the deferred balance trigger fires
+per posting and is simply never reached by an entry with none. The entry is
+also kept out of the `entryIds` a bet returns, which name the two money
+entries.
+
+History is ordered by journal id, never by timestamp. Every one of these
+entries is written inside one transaction, so `now()` returns the same value
+for all of them and sorting by time would be arbitrary.
+
+---
+
+## D27 — The nonce is allocated under the active seed's row lock
+
+`placeBet()` takes `SELECT … FOR UPDATE` on the active seed, uses the nonce it
+finds, and increments it — all inside the bet's transaction. The lock is held
+until commit, so bets serialise on the seed row and two of them cannot read the
+same nonce.
+
+Because the increment shares the bet's transaction, a bet that fails gives its
+nonce back: the next bet reuses it rather than leaving a hole in the sequence.
+A hole would not be fatal, but it would mean a published nonce sequence with
+gaps that nobody could account for.
+
+*Rejected:* `MAX(nonce) + 1`, which is a read-then-write race; a counter in this
+process, which stops working when a second instance starts; and a separate
+transaction for the increment, which would survive a rolled-back bet.
+
+The unique index on `(seed_id, nonce)` is the final guard. Removing the row
+lock makes the concurrency test fail on exactly that index, which is the
+database catching what the application let through.
+
+A rotation committing between the statement starting and the row being locked
+leaves the query with no row, because Postgres rechecks the locked tuple
+against `status = 'active'` and the old seed no longer matches. That is a lost
+race rather than an error, so the selection is retried once against the seed
+the rotation installed.
+
+---
+
+## D28 — Duplicate bets are serialised by a transaction-scoped advisory lock
+
+`placeBet()` takes `pg_advisory_xact_lock(hashtext(betId))` before reading or
+writing anything. Two concurrent deliveries of the same bet id would otherwise
+both find no row and both proceed; the primary key would stop the second from
+persisting, but only after it had consumed a nonce and moved money.
+
+The refusal echoes the original persisted bet with `idempotent: true`, so a
+retry after a dropped response gets the first outcome rather than a second one.
+There is never more than one outcome for a bet id.
+
+Removing this makes the sequential duplicate surface as Postgres error 23505
+and the concurrent pair deadlock with 40P01 — which is what "the primary key is
+enough" actually looks like.
+
+---
+
+## D29 — Payout is integer arithmetic, floor, in BigInt
+
+`multiplier = 99 / targetUnder` at a 1% margin. Since the target is already
+integer hundredths, the whole expression is `amountMinor * 9900n /
+BigInt(targetUnderHundredths)`: no decimal appears anywhere. BigInt division
+truncates toward zero and both operands are positive, so this is the floor the
+specification asks for, and no rounding can invent a fraction of a minor unit
+the ledger cannot represent.
+
+On a win the treasury funds the difference between the stake already in escrow
+and the payout. When the payout happens to equal the stake — possible at a
+target near 98.00 for a tiny stake — that leg is zero, and a posting of zero is
+not a movement, so it is dropped rather than offered to a schema that rejects
+it.

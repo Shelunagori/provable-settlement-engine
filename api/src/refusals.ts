@@ -5,10 +5,13 @@
  * never in the client and never in a pre-flight check that a later caller
  * could skip.
  *
- * H1 introduces only the one refusal the ledger core can reach on its own.
- * The full table arrives with the engine that can trigger the rest.
+ * The table fills in as the surfaces that can reach each refusal are built.
  */
-export type RefusalCode = 'INSUFFICIENT_FUNDS';
+export type RefusalCode =
+  | 'INSUFFICIENT_FUNDS'
+  | 'ROUND_CLOSED'
+  | 'DUPLICATE_BET'
+  | 'INVALID_TARGET';
 
 type RefusalSpec = { httpStatus: number; summary: string; enforcedIn: string };
 
@@ -17,6 +20,21 @@ export const REFUSALS: Record<RefusalCode, RefusalSpec> = {
     httpStatus: 409,
     summary: 'The derived balance of the account cannot absorb this debit.',
     enforcedIn: 'postEntry(), inside the caller transaction, under the account row lock',
+  },
+  ROUND_CLOSED: {
+    httpStatus: 409,
+    summary: 'The round is not in the state this transition requires.',
+    enforcedIn: 'engine/round.ts, under SELECT ... FOR UPDATE on the round',
+  },
+  DUPLICATE_BET: {
+    httpStatus: 409,
+    summary: 'A bet with this id already exists; its original outcome is returned unchanged.',
+    enforcedIn: 'placeBet(), under a transaction-scoped advisory lock on the bet id',
+  },
+  INVALID_TARGET: {
+    httpStatus: 422,
+    summary: 'targetUnder must be an exact decimal between 1.00 and 98.00.',
+    enforcedIn: 'bet input parsing, before any write',
   },
 };
 
