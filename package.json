@@ -3,12 +3,17 @@
   "private": true,
   "version": "0.1.0",
   "description": "Server-authoritative money core with a double-entry ledger, idempotent payment ingestion and reproducible settlement outcomes.",
-  "workspaces": ["api", "web"],
-  "engines": { "node": ">=20" },
+  "workspaces": [
+    "api",
+    "web"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "concurrently -n api,web -c cyan,magenta \"npm -w api run dev\" \"npm -w web run dev\"",
     "build": "npm -w api run build && npm -w web run build",
-    "test": "npm -w api run test",
+    "test": "npm -w api run test && npm -w web run test",
     "migrate": "npm -w api run migrate",
     "typecheck": "npm -w api run typecheck && npm -w web run typecheck"
   },

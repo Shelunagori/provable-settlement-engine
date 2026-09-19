@@ -123,6 +123,18 @@ A losing bet pays the referring affiliate 1% of the treasury's take as its own
 `commission` entry, in the same transaction as the settlement — visible at
 `GET /affiliate/:id`, derived from postings rather than stored.
 
+## The console
+
+`web/` is an operator console called **ledgerproof**. Every figure it shows is
+derived from an API response; it holds no financial state of its own.
+
+The one piece of domain logic it carries is `web/src/fairness/verify.ts`, an
+independent Web Crypto implementation of the outcome algorithm. It does not
+import the server's implementation and does not call `GET /fairness/verify` —
+recomputing the HMAC and the seed commitment locally is the entire point. It is
+tested against `fixtures/fairness-vectors.json`, the same fixture the API tests
+use.
+
 ## Run locally
 
 ```bash

@@ -540,3 +540,46 @@ treasury account's row lock, so a separate connection deadlocks against itself.
 
 The commission is not the user's money and is excluded from the daily-loss
 figure: a losing bet of 500 moves the user's daily net by -500, not -505.
+
+---
+
+## D35 — The browser verifier is a second implementation, not a second call
+
+`web/src/fairness/verify.ts` recomputes outcomes with Web Crypto. It does not
+import the API's `outcome.ts` and it never calls `GET /fairness/verify`: a check
+that asks the party being checked for the answer proves nothing. Rotation
+verification likewise recomputes `SHA256(revealedSeed)` locally and ignores the
+server's own `matchesHash` field.
+
+It consumes `fixtures/fairness-vectors.json` — the same file the API tests
+consume — rather than a copy of its numbers, so the two implementations cannot
+drift apart quietly. Mutating the verifier to key the HMAC with the hex-decoded
+seed produces `fd9fa715…` instead of `78c3773b…` and the fixture test fails,
+which is the encoding contract from D22 holding on the client side too.
+
+Rolls are compared as integer hundredths on both sides, so a server reporting
+59.64 against a computed 59.63 is reported as a mismatch rather than rounded
+into agreement.
+
+---
+
+## D36 — The console displays; it does not decide
+
+The frontend formats values, computes the informational multiplier, sums the
+postings it was given for a visible Σ badge, and verifies fairness
+cryptographically. It decides nothing: sufficiency of funds, daily limits, bet
+validity, payout, commission, nonce allocation, round transitions and
+idempotency are all server answers, and the UI renders whatever comes back —
+including refusals, which are proof rather than errors to be swallowed.
+
+The one place this is visible in the design is the refusal quick actions. There
+is no `/demo/refuse/*` endpoint and no state reset to manufacture an
+`INSUFFICIENT_FUNDS`: codes that cannot be triggered safely and deterministically
+from the UI are shown in the refusal table, served by `GET /refusals`, with a
+note about what reaching them requires.
+
+The invariants strip states what each pill actually knows. The derived-balance
+pill describes the design and names the test that asserts it, rather than
+implying it inspected the schema live, and the webhook pill shows the figures
+the storm you ran returned rather than inventing cumulative statistics no
+endpoint reports.
