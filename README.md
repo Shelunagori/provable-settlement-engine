@@ -1,31 +1,92 @@
 # ledgerproof
 
-A server-authoritative money core whose invariants are tested, not assumed.
+**A server-authoritative wagering settlement engine with ledger-backed balances
+and independently verifiable outcomes.**
 
 [![ci](https://github.com/Shelunagori/provable-settlement-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/Shelunagori/provable-settlement-engine/actions/workflows/ci.yml)
 
-A wagering proof of concept where a user funds a demo wallet, stakes credits on
-a target and receives a server-settled win or loss. Behind that flow: a
-double-entry ledger where no balance is ever stored, payment ingestion that is
-idempotent under concurrent duplicate delivery, settlement outcomes anyone can
-recompute from published data, and a console that shows each of those holding
-rather than claiming it. The browser chooses what to ask for; the API and
-PostgreSQL decide what is true.
+ledgerproof is a proof of concept where a user can fund a demo wallet, choose a
+stake and target, place a bet, receive a server-settled win or loss, and later
+verify that result independently in the browser.
 
-## Live demo
+Underneath that simple flow, every financial movement is recorded in a
+double-entry ledger, balances are derived rather than directly writable,
+duplicate payments settle once, and concurrent requests cannot spend the same
+funds twice.
+
+## Live POC
 
 | | |
 |---|---|
-| Demo | <https://provable-settlement-engine-api.vercel.app> |
-| POC review | <https://provable-settlement-engine-api.vercel.app/review> |
+| Live demo | <https://provable-settlement-engine-api.vercel.app> |
+| POC walkthrough | <https://provable-settlement-engine-api.vercel.app/review> |
 | API health | <https://pseapi-production.up.railway.app/health> |
 
-The review page explains the whole system to someone who has never seen it —
-what a bet is, where the money goes, why the balance cannot be edited, and what
-the POC does and does not claim. Start there if you have five minutes; start at
-the demo if you have one.
+If this is your first time seeing the project, start with the POC walkthrough.
 
-Demo credits only: no real money, no payment provider, no custody.
+Demo credits only. No real money. No real payment provider. No custody.
+
+## How does a bet work?
+
+You pick how much to stake and a target between `1.00` and `98.00`. The server
+generates a result from `0.00` to `99.99`, and you win when the result lands
+**below** your target.
+
+```
+Wallet balance       100.00 credits
+Bet amount             5.00 credits
+Target                50.00
+Win condition         result < 50.00
+Potential payout       9.90 credits
+```
+
+```
+41.72  <  50.00   ->  WIN    paid  9.90 credits
+81.11  >= 50.00   ->  LOSS   stake kept by the treasury
+```
+
+A lower target is harder to hit and pays more; a higher target is easier and
+pays less. The same 5.00 stake returns 495.00 credits at a target of `1.00` and
+5.05 at `98.00`. A result exactly equal to the target is a loss — the comparison
+is strictly `<`, and it is done on integer hundredths so nothing can be rounded
+into a win.
+
+Stakes run from `1.00` to `500.00` credits, with a daily net-loss limit of
+`2000.00`. All of it is decided server-side; the browser only asks.
+
+## 60-second walkthrough
+
+1. Open the [live demo](https://provable-settlement-engine-api.vercel.app).
+2. Click **Reset demo** for a clean state.
+3. **Add 10 credits.**
+4. Set **Bet amount** = `5.00`.
+5. Set **Target** = `50.00`.
+6. Click **Place bet**.
+7. Read the win or loss result and the updated balance.
+8. Open **Verify fairness** and independently verify the settled result.
+
+Refreshing the browser does not reset the wallet, because the state lives in
+PostgreSQL. Use **Reset demo** when you want a fresh POC environment.
+
+*Advanced proofs* holds the raw evidence: the duplicate-payment test, the
+balance-write rejection, the refusal codes, the ledger and journal, fairness
+history and affiliate settlement.
+
+### Demo reset
+
+`POST /demo/reset` is available only when the API runs with:
+
+```
+DEMO_RESET_ENABLED=true
+```
+
+It clears the isolated demo dataset and recreates the baseline state. It is a
+POC lifecycle operation, not a writable-balance endpoint, and it cannot target
+arbitrary users — the request takes no parameters, so there is no account id to
+pass. The flag is deliberately separate from `NODE_ENV`, so running in
+production mode is never what enables it. Real deployments should leave it
+disabled. Implementation notes are in
+[docs/DECISIONS.md](docs/DECISIONS.md) (D42).
 
 ## What this proves
 
@@ -41,58 +102,11 @@ Demo credits only: no real money, no payment provider, no custody.
 Each one is explained in full — why it matters, what enforces it, and the
 mutation that turns its test red — in **[docs/INVARIANTS.md](docs/INVARIANTS.md)**.
 
-## 60-second tour
-
-Run locally (below) and open the console. The demo is a wagering flow first:
-
-| Step | Do this | What it proves |
-|---|---|---|
-| 1 | **Reset demo** | Returns the whole demo to a fresh install: no credits, no bets, one active seed |
-| 2 | **Add 10 credits** | Money enters as a payment webhook and becomes one balanced journal entry |
-| 3 | **Place bet** | The server settles it: result, win or loss, payout, and two more entries |
-| 4 | Read the result | Balance updates, and the bet appears under *Recent bets* |
-| 5 | **Reveal & verify** | Your browser recomputes the same result with `crypto.subtle`, without asking the server |
-
-Refreshing the browser does **not** reset your wallet. The demo state lives in
-PostgreSQL, so credits survive a reload — which is the point: the balance is
-server-side, derived from the ledger, and the browser holds none of it. Use
-**Reset demo** for a clean environment.
-
-Under *Advanced proofs* the raw evidence is still there: the ledger and journal
-with a live balance check and the balance-write refusal (*Ledger*), the
-duplicate-payment storm (*Duplicate protection*), every refusal code the server
-enforces (*Server rules*), revealed seed history (*Fairness*) and affiliate
-accrual (*Affiliate*).
-
-The console is light by default and offers Light / Dark / System, remembered in
-`localStorage`. There is no endpoint that stores a theme, and adding one would
-mean the interface holding state the server does not know about.
-
-### Demo reset
-
-`POST /demo/reset` exists only when the API is started with:
-
-```
-DEMO_RESET_ENABLED=true
-```
-
-Without it the route answers 404 like any unknown path. The flag is deliberately
-separate from `NODE_ENV`: the public demo runs with `NODE_ENV=production` and
-wants the reset, while a real deployment of this engine runs the same way and
-must not have it.
-
-The reset takes no parameters — there is no account id to pass, so it cannot be
-aimed at anything but the fixed demo dataset. It clears demo activity, reseeds
-the chart of accounts and installs one active server seed, all in a single
-transaction. It writes no balance and could not: there is no balance column, and
-postings stay append-only to every path the product exposes. It is an
-environment lifecycle operation, not a financial one.
-
 ## Architecture
 
 ```mermaid
 flowchart TD
-    B["Browser · ledgerproof console"]
+    B["Browser · ledgerproof demo"]
     V["web/src/fairness/verify.ts<br/>crypto.subtle"]
     A["Fastify API"]
     P["postEntry()<br/>the only path money moves"]
@@ -113,12 +127,19 @@ flowchart TD
     style P stroke-width:2px
 ```
 
-**PostgreSQL is the financial authority. The console is not.** The frontend
-formats values, sums the postings it was handed so the arithmetic is visible,
-and verifies fairness cryptographically. It decides nothing: sufficiency of
-funds, limits, validity, payout, commission, nonce allocation, round transitions
-and idempotency are all server answers. Its own state is one session cookie and
-the form fields you are typing into.
+**PostgreSQL is the financial authority. The frontend is not.**
+
+| Layer | Responsible for |
+|---|---|
+| Frontend | Interaction, and independent fairness verification |
+| API | Domain decisions: validation, settlement, lifecycle |
+| PostgreSQL | Financial authority: balanced entries, locks, uniqueness |
+
+The frontend formats values, sums the postings it was handed so the arithmetic
+is visible, and verifies fairness cryptographically. It decides nothing:
+sufficiency of funds, limits, validity, payout, commission, nonce allocation,
+round transitions and idempotency are all server answers. Its own state is one
+session cookie and the form fields you are typing into.
 
 ## Ledger design
 
@@ -242,8 +263,8 @@ Full table with HTTP statuses and enforcement points:
 **[docs/REFUSALS.md](docs/REFUSALS.md)** — generated from
 [`api/src/refusals.ts`](api/src/refusals.ts) by `npm run docs:refusals`, with
 `npm run docs:check` failing the build on drift. The same object is served by
-`GET /refusals` and rendered by the console, so the code is the only source of
-truth.
+`GET /refusals` and rendered by the web interface, so the code is the only
+source of truth.
 
 ## Property testing
 
@@ -269,7 +290,7 @@ history and are counted, not failed. Anything else aborts the sequence.
 docker compose up -d      # postgres:16, creates pse and pse_test
 cp .env.example .env
 npm ci
-npm run dev               # API on :8080, console on :5173
+npm run dev               # API on :8080, web interface on :5173
 ```
 
 Migrations run automatically on boot and are idempotent — there is no schema to
@@ -283,7 +304,7 @@ npm run build
 
 ## Deploy
 
-API and PostgreSQL on Railway, console on Vercel. Step-by-step configuration,
+API and PostgreSQL on Railway, frontend on Vercel. Step-by-step configuration,
 required environment variables and the cross-origin session setup are in
 **[docs/DEPLOY.md](docs/DEPLOY.md)**.
 
@@ -292,16 +313,22 @@ so a platform health probe can actually remove a broken instance from service.
 
 ## Production gaps / out of scope
 
-This is a reference implementation of a settlement core, not a complete
-regulated stack. Deliberately absent:
+This is a proof of concept of a settlement core, not a complete regulated
+stack. None of the following is included, and none of it is simulated:
 
-- payment-provider signature verification and real settlement rails
-- identity and compliance checks, and per-jurisdiction limits
-- HSM- or KMS-backed seed custody and key rotation policy
+- real payment-provider integration, signature verification and settlement rails
+- real-money custody
+- customer onboarding, KYC and per-jurisdiction compliance
+- responsible-gaming controls
+- production seed custody (HSM or KMS) and a key rotation policy
 - reconciliation jobs and audit export
 - multi-currency and FX
 - richer affiliate structures
-- production observability, rate limiting and abuse controls
+- production admin tooling
+- rate limiting and abuse controls
+- production observability and on-call setup
+- backup and disaster-recovery procedures
+- a formal production security review
 
 ## Decisions
 
