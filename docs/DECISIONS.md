@@ -205,3 +205,87 @@ Internally every amount is `bigint`. Route handlers pass their result through
 `jsonSafe()`, which converts `bigint` to `number` at the single point where the
 response is serialised and throws rather than truncate if a value ever left the
 safe integer range. Handlers never convert money themselves.
+
+---
+
+## D17 — The unique index on `webhook_events.event_id` is the idempotency arbiter
+
+`ingestPaymentEvent()` opens with `INSERT … ON CONFLICT (event_id) DO NOTHING
+RETURNING event_id`. The transaction that gets a row back owns the event and
+moves the money; a transaction that gets nothing back is a duplicate and
+returns the committed entry id.
+
+`ON CONFLICT DO NOTHING` is a speculative insertion: when another transaction
+holds the same key uncommitted, Postgres makes this statement *wait* on that
+transaction rather than guess. If the other side commits, the conflict resolves
+and this statement returns no row; if it rolls back, this statement inserts and
+wins instead. The database picks the winner, under a constraint no future
+caller can forget to consult.
+
+*Rejected:* `SELECT` whether the event exists, then `INSERT` if it does not.
+Two deliveries can both read "absent" before either writes, and both then post.
+The window is milliseconds and the consequence is a customer credited twice —
+the class of bug that only appears under the load that makes it expensive.
+
+*Rejected:* an application mutex, an in-memory set of seen ids, or an external
+lock. All of them are per-process state and stop working the moment a second
+instance of the service starts.
+
+---
+
+## D18 — Reservation and money movement are one transaction
+
+The `webhook_events` insert, the `postEntry()` call and the `entry_id` update
+share the caller's single transaction. A failure anywhere rolls back all three.
+
+The state being avoided is a row where `event_id` exists and `entry_id` is
+NULL: every later retry of that event would be told "duplicate" for money that
+was never credited, and no amount of retrying would fix it. The duplicate path
+therefore treats a NULL `entry_id` as unreachable and throws rather than
+returning it, so that if the two ever are split apart the failure is loud
+instead of silent.
+
+---
+
+## D19 — `/demo/webhook-storm` sends real HTTP to its own port, and proves it
+
+The endpoint discovers its own listening port and fires `count` concurrent
+`fetch()` calls at `/webhooks/payment`. Calling the handler in a loop would
+demonstrate only that a function is deterministic; what is worth showing is
+that N simultaneous connections, N pooled database sessions and N transactions
+contending on one unique index still produce one journal entry.
+
+It reports `httpDeliveries`, the number of requests that actually arrived at
+the webhook route during the run. That makes "these were real HTTP requests" a
+checkable claim: an in-process implementation reports 0 while still getting
+`posted` and `deduplicated` right, and the test fails on it. Bounded at 100 so
+a demo endpoint cannot become an unbounded self-request amplifier.
+
+---
+
+## D20 — Concurrency tests warm the connection pool first
+
+A burst of requests against a cold pool does not overlap. Establishing a
+Postgres connection costs more than one of these transactions takes, so the
+first request commits and returns its client to the pool before the second has
+finished connecting, and the requests serialise.
+
+This was not theoretical. The first version of `exactly_once` passed six runs
+out of six against an implementation with a deliberate read-then-write race:
+instrumentation showed exactly one transaction of twenty ever saw the event as
+absent. The test asserted all the right outcomes and had no power to detect the
+bug it exists to catch.
+
+`warmPool()` opens and releases the connections before the burst, and tests run
+with a larger `PG_POOL_MAX` than production, which keeps a free-tier connection
+budget. With the pool warm the same mutation fails six runs out of six.
+
+---
+
+## D21 — Payload validation refuses with `INVALID_PAYLOAD`, not a refusal-table code
+
+Schema violations and an unknown or non-user `user_id` return 422 with
+`code: 'INVALID_PAYLOAD'`. These are malformed requests rather than business
+decisions, so they deliberately do not claim a place in the refusal table. If
+the table later wants a code for "no such account", this is the call site to
+revisit.

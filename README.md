@@ -16,7 +16,7 @@ invariant gets the test that proves it.
 |---|---|---|
 | Σ postings = 0, enforced by the database | `api/test/invariants/sum_is_zero.test.ts` | ✓ |
 | Balance is derived; nothing can write it | `api/test/invariants/balance_is_derived.test.ts` | ✓ |
-| Duplicate payment events post exactly once, including concurrently | `api/test/invariants/exactly_once.test.ts` | |
+| Duplicate payment events post exactly once, including concurrently | `api/test/invariants/exactly_once.test.ts` | ✓ |
 | A user account never goes negative under concurrency | `api/test/invariants/never_negative.test.ts` | |
 | Outcomes are reproducible from revealed seeds | `api/test/invariants/deterministic_outcome.test.ts` | |
 | Rounds move open → locked → resolved → settled, only | `api/test/invariants/lifecycle_is_linear.test.ts` | |
@@ -39,6 +39,25 @@ units is `gateway -1000, user:demo +1000`.
 | `GET /ledger/entries?limit=50` | entries newest first, with postings and their sum |
 | `GET /ledger/invariants` | live check: global sum, per-entry sums, posting count |
 | `PUT /balance` | 404 `NO_SUCH_ENDPOINT` — there is nothing here to write |
+
+## Payment ingestion
+
+`POST /webhooks/payment` is idempotent under duplicate and concurrent delivery.
+The arbiter is the unique key on `webhook_events.event_id`: the transaction
+that wins `INSERT … ON CONFLICT DO NOTHING` moves the money, and the losers
+return the entry id it committed. Reservation and ledger posting are one
+transaction, so a failed posting takes the reservation with it and the event
+can be retried.
+
+```
+POST /webhooks/payment   first    -> { "posted": true,  "entryId": 1 }
+POST /webhooks/payment   repeat   -> { "posted": false, "deduplicated": true, "entryId": 1 }
+POST /demo/webhook-storm          -> { "sent": 20, "posted": 1, "deduplicated": 19, "httpDeliveries": 20 }
+```
+
+`/demo/webhook-storm` fires real concurrent HTTP at this server's own port and
+reports how many deliveries actually arrived, so the demonstration cannot
+quietly degrade into an in-process loop.
 
 ## Run locally
 
