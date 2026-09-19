@@ -9,6 +9,14 @@ pg.types.setTypeParser(pg.types.builtins.INT8, (v: string) => BigInt(v));
 export type Pool = pg.Pool;
 export type PoolClient = pg.PoolClient;
 
+/**
+ * Anything that can run a statement: the pool, or one client already inside a
+ * transaction. Helpers that must be callable from both take this rather than
+ * reaching for the pool themselves -- a helper that opens its own connection
+ * while the caller holds a lock will wait on that lock forever.
+ */
+export type Queryable = Pick<pg.Pool, 'query'> | Pick<pg.PoolClient, 'query'>;
+
 let pool: pg.Pool | null = null;
 
 export const getPool = (): pg.Pool => {

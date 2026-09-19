@@ -4,27 +4,31 @@ import { formatMinor, formatSignedMinor } from '../format.ts';
 import type { AccountBalance, Me } from '../types.ts';
 
 /**
- * The strongest component on the page, so it gets the primary card treatment.
- * Human wording leads; how the figure is derived is one click away rather than
- * printed under the balance.
+ * What you have, and the two things you can do about it. Nothing here explains
+ * the ledger unless someone asks.
  */
 export const WalletCard = ({
   me,
   accounts,
   loading,
   depositBusy,
+  resetBusy,
+  resetAvailable,
   onDeposit,
-  onRunDemo,
+  onReset,
 }: {
   me: Me | null;
   accounts: AccountBalance[] | null;
   loading: boolean;
   depositBusy: boolean;
+  resetBusy: boolean;
+  resetAvailable: boolean;
   onDeposit: () => void;
-  onRunDemo: () => void;
+  onReset: () => void;
 }) => {
   const inPlay = accounts?.find((a) => a.accountId === 'pending_bets')?.balanceMinor ?? null;
   const ready = me !== null;
+  const empty = ready && me.balanceMinor === 0;
 
   return (
     <Card tier="primary" className="p-5 sm:p-6">
@@ -37,47 +41,64 @@ export const WalletCard = ({
             Demo wallet
           </p>
         </div>
-        <Badge tone="fairness">Demo funds</Badge>
+        <Badge tone="fairness">Demo credits</Badge>
       </div>
 
-      <div className="mt-5">
-        {ready ? (
-          <p className="num text-[2.75rem] font-semibold leading-none tracking-tight">
-            {formatMinor(me.balanceMinor)}
-          </p>
-        ) : (
-          <Skeleton className="h-11 w-48" />
-        )}
-        <p className="mt-2 text-sm text-ink-2">Available demo balance</p>
-        <Disclosure summary="How is this calculated?" className="mt-1.5">
-          Your balance is the sum of ledger postings. There is no editable balance field, and no
-          endpoint that writes one.
-        </Disclosure>
-      </div>
+      {empty ? (
+        <div className="mt-5">
+          <p className="text-lg font-semibold">Your demo wallet is empty.</p>
+          <p className="mt-1 text-sm text-ink-2">Add credits to place your first bet.</p>
+        </div>
+      ) : (
+        <div className="mt-5">
+          {ready ? (
+            <p className="num text-[2.75rem] font-semibold leading-none tracking-tight">
+              {formatMinor(me.balanceMinor)}
+            </p>
+          ) : (
+            <Skeleton className="h-11 w-48" />
+          )}
+          <p className="mt-1.5 text-sm text-ink-2">Available balance, in credits</p>
+        </div>
+      )}
 
-      <dl className="mt-5 grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-line bg-subtle px-3 py-2">
-          <dt className="text-[11px] uppercase tracking-wider text-muted">Today</dt>
-          <dd className="num mt-0.5 text-sm">
-            {ready ? formatSignedMinor(me.dailyNetMinor) : '—'}
-          </dd>
-        </div>
-        <div className="rounded-lg border border-line bg-subtle px-3 py-2">
-          <dt className="text-[11px] uppercase tracking-wider text-muted">In play</dt>
-          <dd className="num mt-0.5 text-sm">
-            {inPlay === null ? '—' : formatMinor(Math.abs(inPlay))}
-          </dd>
-        </div>
-      </dl>
+      {!empty && (
+        <dl className="mt-5 grid grid-cols-2 gap-3">
+          <div className="rounded-lg border border-line bg-subtle px-3 py-2">
+            <dt className="text-[11px] uppercase tracking-wider text-muted">Today</dt>
+            <dd className="num mt-0.5 text-sm">
+              {ready ? formatSignedMinor(me.dailyNetMinor) : '—'}
+            </dd>
+          </div>
+          <div className="rounded-lg border border-line bg-subtle px-3 py-2">
+            <dt className="text-[11px] uppercase tracking-wider text-muted">In play</dt>
+            <dd className="num mt-0.5 text-sm">
+              {inPlay === null ? '—' : formatMinor(Math.abs(inPlay))}
+            </dd>
+          </div>
+        </dl>
+      )}
 
       <div className="mt-5 flex flex-wrap gap-2">
         <Button variant="primary" onClick={onDeposit} busy={depositBusy} disabled={loading}>
-          Add 10.00
+          Add 10 credits
         </Button>
-        <Button variant="secondary" onClick={onRunDemo}>
-          Run demo
-        </Button>
+        {resetAvailable && (
+          <Button variant="secondary" onClick={onReset} busy={resetBusy}>
+            Reset demo
+          </Button>
+        )}
       </div>
+
+      <Disclosure summary="How is balance calculated?" className="mt-4">
+        Your balance is calculated from ledger entries. It cannot be directly edited, and there is
+        no endpoint that writes one.
+      </Disclosure>
+
+      <p className="mt-3 text-xs text-muted">
+        Credits live on the server, so refreshing this page keeps them.
+        {resetAvailable ? ' Reset demo is what clears them.' : ''}
+      </p>
     </Card>
   );
 };

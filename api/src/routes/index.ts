@@ -1,7 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { config } from '../config.js';
 import { ping } from '../db.js';
 import { migrationStatus } from '../migrate.js';
 import { registerBetRoutes } from './bets.js';
+import { registerDemoRoutes } from './demo.js';
 import { registerFairnessRoutes } from './fairness.js';
 import { registerLedgerRoutes } from './ledger.js';
 import { registerMetaRoutes } from './meta.js';
@@ -40,7 +42,16 @@ export const healthHandler =
       const db = await deps.ping();
       if (!db) throw new Error('database did not answer');
       const migrations = (await deps.migrationStatus()).map((m) => m.filename);
-      return reply.status(200).send({ ok: true, db: true, migrations, uptimeSeconds });
+      // Which optional facilities this deployment actually has. The console
+      // uses it to decide whether to offer the demo reset at all, rather than
+      // showing a button that answers 404 on a deployment without the flag.
+      return reply.status(200).send({
+        ok: true,
+        db: true,
+        migrations,
+        uptimeSeconds,
+        features: { demoReset: config.demoResetEnabled },
+      });
     } catch {
       return reply
         .status(503)
@@ -60,4 +71,5 @@ export const registerRoutes = async (
   await registerBetRoutes(app);
   await registerSessionRoutes(app);
   await registerMetaRoutes(app);
+  await registerDemoRoutes(app);
 };

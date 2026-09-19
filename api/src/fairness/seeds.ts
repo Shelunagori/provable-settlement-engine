@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { getPool, withTx } from '../db.js';
+import { getPool, withTx, type Queryable } from '../db.js';
 import { seedHashOf } from './outcome.js';
 
 export type Commitment = { seedHash: string; nonce: bigint };
@@ -9,6 +9,29 @@ export type RevealedSeed = { seed: string; seedHash: string; revealedAt: Date };
 export const generateSeed = (): { seed: string; seedHash: string } => {
   const seed = randomBytes(32).toString('hex');
   return { seed, seedHash: seedHashOf(seed) };
+};
+
+/**
+ * Inserts a freshly generated active seed, or reports that one already exists.
+ *
+ * Takes whatever can run a query -- the pool at boot, a transaction client
+ * during a demo reset -- because a reset holds locks that a second connection
+ * would wait on forever. If an active seed already exists the partial unique
+ * index rejects the insert and ON CONFLICT DO NOTHING turns that rejection into
+ * zero rows rather than an error.
+ */
+export const insertActiveSeed = async (q: Queryable): Promise<Commitment | null> => {
+  const { seed, seedHash } = generateSeed();
+  const { rows, rowCount } = await q.query<{ seed_hash: string; nonce: bigint }>(
+    `INSERT INTO server_seeds (seed, seed_hash, status, nonce)
+     VALUES ($1, $2, 'active', 0)
+     ON CONFLICT DO NOTHING
+     RETURNING seed_hash, nonce`,
+    [seed, seedHash],
+  );
+  if (rowCount !== 1) return null;
+  const row = rows[0]!;
+  return { seedHash: row.seed_hash, nonce: row.nonce };
 };
 
 /**
@@ -23,21 +46,10 @@ export const generateSeed = (): { seed: string; seedHash: string } => {
  * instance insert a second active seed.
  */
 export const ensureActiveSeed = async (): Promise<Commitment> => {
-  const { seed, seedHash } = generateSeed();
+  const inserted = await insertActiveSeed(getPool());
 
-  // If an active seed already exists the partial unique index rejects this and
-  // ON CONFLICT DO NOTHING turns the rejection into zero rows.
-  const inserted = await getPool().query<{ seed_hash: string; nonce: bigint }>(
-    `INSERT INTO server_seeds (seed, seed_hash, status, nonce)
-     VALUES ($1, $2, 'active', 0)
-     ON CONFLICT DO NOTHING
-     RETURNING seed_hash, nonce`,
-    [seed, seedHash],
-  );
-
-  if (inserted.rowCount === 1) {
-    const row = inserted.rows[0]!;
-    return { seedHash: row.seed_hash, nonce: row.nonce };
+  if (inserted) {
+    return inserted;
   }
 
   const existing = await getActiveCommitment();

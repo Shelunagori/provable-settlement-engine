@@ -4,6 +4,8 @@ import { rotateAndCheck, verifyBet, type Reveal, type Verification } from '../co
 import type { BetRow, PlacedBet, StormResult } from '../types.ts';
 
 export type Refusal = { status: number; body: Record<string, unknown> };
+/** Where a one-click fairness check has got to, for a plain-English progress line. */
+export type FairnessStep = 'idle' | 'revealing' | 'verifying' | 'done';
 export type ActionError = { message: string };
 
 export type BetInput = { amountMinor: number; targetUnder: string; clientSeed: string };
@@ -19,7 +21,7 @@ export const useEngine = ({
   onChanged,
   toast,
 }: {
-  onChanged: (what: 'deposit' | 'bet' | 'seed') => void;
+  onChanged: (what: 'deposit' | 'bet' | 'seed' | 'reset') => void;
   toast: (text: string) => void;
 }) => {
   const [busy, setBusy] = useState<string | null>(null);
@@ -33,6 +35,7 @@ export const useEngine = ({
   const [balanceProbe, setBalanceProbe] = useState<{ status: number; body: unknown } | null>(null);
   const [reveal, setReveal] = useState<Reveal | null>(null);
   const [verification, setVerification] = useState<Verification | null>(null);
+  const [fairnessStep, setFairnessStep] = useState<FairnessStep>('idle');
 
   const run = useCallback(async (name: string, fn: () => Promise<void>) => {
     setBusy(name);
@@ -154,6 +157,52 @@ export const useEngine = ({
     [run],
   );
 
+  /**
+   * One action for the person, two operations underneath.
+   *
+   * A bet can only be checked once the secret it used has been retired and
+   * disclosed, so this reveals first and verifies second. Asking someone to
+   * understand two cryptographic steps before they can see whether the result
+   * was honest is a tax on the wrong people; the steps are still named and
+   * reported, they just do not have to be driven by hand.
+   */
+  const verifyFairness = useCallback(
+    (row: BetRow) =>
+      run('fairness', async () => {
+        setFairnessStep('revealing');
+        const revealed = await rotateAndCheck();
+        setReveal(revealed);
+        setFairnessStep('verifying');
+        setVerification(await verifyBet(row));
+        setFairnessStep('done');
+        onChanged('seed');
+      }),
+    [run, onChanged],
+  );
+
+  /**
+   * Returns the whole demo to a fresh environment. This is a server-side
+   * operation: the balance lives in the ledger, so clearing the browser would
+   * change nothing.
+   */
+  const resetDemo = useCallback(
+    () =>
+      run('reset', async () => {
+        await api.resetDemo();
+        setBet(null);
+        setReveal(null);
+        setVerification(null);
+        setFairnessStep('idle');
+        setLastBetId(null);
+        setDepositEntryId(null);
+        setStorm(null);
+        setBalanceProbe(null);
+        toast('Demo reset · your wallet is back to 0 credits');
+        onChanged('reset');
+      }),
+    [run, onChanged, toast],
+  );
+
   return {
     busy,
     refusal,
@@ -165,6 +214,7 @@ export const useEngine = ({
     balanceProbe,
     reveal,
     verification,
+    fairnessStep,
     deposit,
     runStorm,
     probeBalanceWrite,
@@ -172,6 +222,8 @@ export const useEngine = ({
     replayLastBet,
     rotate,
     verify,
+    verifyFairness,
+    resetDemo,
     clearOutcome: () => {
       setRefusal(null);
       setFailure(null);
@@ -185,6 +237,7 @@ export const useEngine = ({
       setBet(null);
       setReveal(null);
       setVerification(null);
+      setFairnessStep('idle');
       setRefusal(null);
       setFailure(null);
     },

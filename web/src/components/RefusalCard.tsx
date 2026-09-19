@@ -46,7 +46,7 @@ export const RefusalCard = ({
   const details = Object.entries(body).filter(([k]) => !SKIP.has(k));
 
   return (
-    <div className="rounded-xl border border-refusal/30 border-l-4 border-l-refusal bg-refusal-soft px-4 py-3.5">
+    <div className="rounded-xl border border-refusal-border border-l-4 border-l-refusal bg-refusal-soft px-4 py-3.5">
       <div className="flex items-center gap-2">
         <ShieldCheckIcon className="h-4 w-4 shrink-0 text-refusal" />
         <p className="text-sm font-semibold text-refusal">Request refused</p>

@@ -730,3 +730,84 @@ ids that used to *be* the copy are now kept as secondary evidence beside it.
 
 None of this reaches the server. No endpoint, request shape or business rule
 changed, and the boundary in D36 still holds: the interface decides nothing.
+
+---
+
+## D42 — /demo/reset is an environment operation, not a financial one
+
+The demo needed a way back to a clean start. Nothing in the product model can
+provide one: postings are append-only by trigger, journal entries are too, and
+there is no balance column to zero. Those are the guarantees the whole system
+exists to demonstrate, so the reset had to be built without weakening any of
+them.
+
+It is therefore a lifecycle operation on a dataset rather than an operation on
+money. `TRUNCATE` clears the demo activity tables, which is possible precisely
+because it is DDL and does not fire the row-level DELETE triggers that make
+`postings` and `journal_entries` immutable — a row delete remains impossible,
+including from this path. The chart of accounts is then reseeded exactly as
+migration 003 seeds it, one active seed is installed, and all of it commits
+together. `accounts`, `affiliate_links` and `sessions` are untouched: the chart
+is a fixture rather than activity, and a visitor should not be silently signed
+out by a reset.
+
+Enablement is its own flag, `DEMO_RESET_ENABLED=true`, and not a `NODE_ENV`
+check. The public demo runs with `NODE_ENV=production` and wants the reset; a
+real deployment of this engine runs the same way and must not have it. Only the
+literal string `true` counts, so a stray `1` or `yes` leaves it off. Disabled, it
+answers the same 404 an unknown path gets, because a destructive endpoint should
+not advertise that it exists and is merely switched off. `/health` reports
+`features.demoReset` so the console can decide whether to offer the button at
+all rather than showing one that 404s.
+
+Nothing about a reset is parameterised by the request. There is no account id in
+the body and no way to name one, which is what keeps it from being a destructive
+admin API wearing a demo's clothes.
+
+Two behaviours came out of testing rather than design. A POST with
+`Content-Type: application/json` and no body — the natural way to call a
+no-parameter endpoint, and what every fetch wrapper sends — was rejected by
+Fastify's default parser and surfaced as a 500; the demo scope now accepts an
+empty body as `{}`. And a reset racing in-flight bets deadlocks, because the two
+acquire their tables in different orders: a bet reads postings while computing a
+daily total, then locks the active seed, while the reset wants exclusive access
+to both. The reset is the right side to lose. It is idempotent and wholly inside
+one transaction, so the victim rolls back with nothing half-done and retries;
+a bet mid-settlement is not something to sacrifice for a demo convenience.
+
+---
+
+## D43 — The wagering flow comes before the proof of it
+
+The console proved the system before it explained the product. A first-time
+visitor met a guided demo, a live proof rail and a progress track, and could
+read every word without learning what they were betting on, what a target meant,
+or what they stood to win.
+
+The page now opens on the thing people came for: a wallet showing credits, and
+one card that asks for a bet amount and a target, shows the potential payout and
+win chance before anything is clicked, and settles into a result that says *You
+won* or *You lost* in the largest type on the page. The target is explained where
+it is set, with an example, and drawn as a band on a 0.00–99.99 track so the
+mechanic is visible rather than inferred — the same information is in the text
+and the figure's caption, so nothing depends on the drawing alone.
+
+Fairness left the required path. Checking a bet is now one action in its own
+section, driving the reveal and the browser recomputation underneath and naming
+both steps as it goes, instead of two cryptographic operations a person had to
+understand before they could see whether the result was honest. The ledger,
+the journal, the duplicate-payment test, the balance-write refusal, the full
+refusal table, seed history and affiliate accrual all moved under *Advanced
+proofs*.
+
+Language followed. Run demo, outcome, commitment, settlement and progress became
+bet amount, target, potential payout, place bet, you won, you lost, balance, bet
+history and verify fairness. The technical vocabulary is still there, one level
+down, where someone who wants it will go looking.
+
+One defect this pass surfaced is worth recording because it was invisible: the
+themed colours are bare CSS variables, so Tailwind's alpha modifiers on them
+(`bg-accent-vivid/45`, `border-refusal/30`) resolve to nothing at all. The
+winning band on the result meter was painting `rgba(0,0,0,0)` and every tinted
+badge border was silently falling back to Tailwind's default grey. Tinted
+surfaces now use solid `-soft` and `-border` tokens instead.

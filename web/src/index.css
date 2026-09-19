@@ -37,16 +37,19 @@
   --c-fairness: #2563eb;
   --c-fairness-vivid: #3b82f6;
   --c-fairness-soft: #eff6ff;
+  --c-fairness-border: #bfdbfe;
 
   /* Amber: pending, attention. */
   --c-pending: #b45309;
   --c-pending-vivid: #f59e0b;
   --c-pending-soft: #fffbeb;
+  --c-pending-border: #fde68a;
 
   /* Red: refused, failed, invalid. */
   --c-refusal: #c81e1e;
   --c-refusal-vivid: #ef4444;
   --c-refusal-soft: #fef2f2;
+  --c-refusal-border: #fecaca;
 
   --c-shadow-1: rgba(15, 23, 42, 0.06);
   --c-shadow-2: rgba(15, 23, 42, 0.10);
@@ -79,12 +82,15 @@
   --dark-fairness: #60a5fa;
   --dark-fairness-vivid: #60a5fa;
   --dark-fairness-soft: #101f35;
+  --dark-fairness-border: #1e3a63;
   --dark-pending: #fbbf24;
   --dark-pending-vivid: #fbbf24;
   --dark-pending-soft: #2a2008;
+  --dark-pending-border: #5a441a;
   --dark-refusal: #fb7185;
   --dark-refusal-vivid: #fb7185;
   --dark-refusal-soft: #2c1219;
+  --dark-refusal-border: #5c2733;
   --dark-shadow-1: rgba(0, 0, 0, 0.24);
   --dark-shadow-2: rgba(0, 0, 0, 0.5);
 }
@@ -109,12 +115,15 @@
   --c-fairness: var(--dark-fairness);
   --c-fairness-vivid: var(--dark-fairness-vivid);
   --c-fairness-soft: var(--dark-fairness-soft);
+  --c-fairness-border: var(--dark-fairness-border);
   --c-pending: var(--dark-pending);
   --c-pending-vivid: var(--dark-pending-vivid);
   --c-pending-soft: var(--dark-pending-soft);
+  --c-pending-border: var(--dark-pending-border);
   --c-refusal: var(--dark-refusal);
   --c-refusal-vivid: var(--dark-refusal-vivid);
   --c-refusal-soft: var(--dark-refusal-soft);
+  --c-refusal-border: var(--dark-refusal-border);
   --c-shadow-1: var(--dark-shadow-1);
   --c-shadow-2: var(--dark-shadow-2);
 
@@ -142,12 +151,15 @@
     --c-fairness: var(--dark-fairness);
     --c-fairness-vivid: var(--dark-fairness-vivid);
     --c-fairness-soft: var(--dark-fairness-soft);
+  --c-fairness-border: var(--dark-fairness-border);
     --c-pending: var(--dark-pending);
     --c-pending-vivid: var(--dark-pending-vivid);
     --c-pending-soft: var(--dark-pending-soft);
+  --c-pending-border: var(--dark-pending-border);
     --c-refusal: var(--dark-refusal);
     --c-refusal-vivid: var(--dark-refusal-vivid);
     --c-refusal-soft: var(--dark-refusal-soft);
+  --c-refusal-border: var(--dark-refusal-border);
     --c-shadow-1: var(--dark-shadow-1);
     --c-shadow-2: var(--dark-shadow-2);
   

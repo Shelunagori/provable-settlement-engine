@@ -71,9 +71,9 @@ export const StatusDot = ({ tone, label }: { tone: Tone; label: string }) => (
 
 const BADGE: Record<Tone, string> = {
   accent: 'text-accent-text border-accent-border bg-accent-soft',
-  fairness: 'text-fairness border-fairness/25 bg-fairness-soft',
-  pending: 'text-pending border-pending/25 bg-pending-soft',
-  refusal: 'text-refusal border-refusal/25 bg-refusal-soft',
+  fairness: 'text-fairness border-fairness-border bg-fairness-soft',
+  pending: 'text-pending border-pending-border bg-pending-soft',
+  refusal: 'text-refusal border-refusal-border bg-refusal-soft',
   muted: 'text-muted border-line bg-subtle',
 };
 
@@ -237,7 +237,7 @@ export const Loading = ({ what }: { what: string }) => (
 );
 
 export const ErrorState = ({ error, base }: { error: Error; base?: string }) => (
-  <div className="rounded-xl border border-refusal/30 bg-refusal-soft px-4 py-4 text-sm">
+  <div className="rounded-xl border border-refusal-border bg-refusal-soft px-4 py-4 text-sm">
     <p className="font-medium text-refusal">The API could not be reached.</p>
     <p className="mt-1 text-ink-2">
       {error.message}

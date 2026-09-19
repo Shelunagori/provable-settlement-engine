@@ -3,6 +3,7 @@ import type {
   AccountBalance,
   BetRow,
   Commitment,
+  DemoReset,
   Health,
   Invariants,
   JournalEntry,
@@ -90,6 +91,13 @@ export const api = {
   seed: () => request<Commitment>('/fairness/seed'),
   rotate: () => post<RotateResult>('/fairness/rotate'),
   revealedSeeds: () => request<RevealedSeed[]>('/fairness/seeds'),
+
+  /**
+   * Returns the demo environment to a fresh state. Exists only when the API was
+   * started with DEMO_RESET_ENABLED=true; otherwise it answers 404 like any
+   * unknown path, which is what the UI checks on load.
+   */
+  resetDemo: () => post<DemoReset>('/demo/reset'),
 
   refusals: () => request<RefusalRow[]>('/refusals'),
   affiliate: (id: string) => request<Affiliate>(`/affiliate/${encodeURIComponent(id)}`),

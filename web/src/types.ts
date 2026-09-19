@@ -1,4 +1,11 @@
-export type Health = { ok: boolean; db: boolean; migrations: string[]; uptimeSeconds: number };
+export type Health = {
+  ok: boolean;
+  db: boolean;
+  migrations: string[];
+  uptimeSeconds: number;
+  /** Optional facilities this deployment has. Absent on an unhealthy answer. */
+  features?: { demoReset: boolean };
+};
 export type Me = { userId: string; balanceMinor: number; dailyNetMinor: number };
 
 export type AccountBalance = { accountId: string; kind: string; balanceMinor: number };
@@ -84,3 +91,9 @@ export type RefusalBody = {
   [key: string]: unknown;
 };
 export type Affiliate = { earnedMinor: number; referred: string[] };
+
+export type DemoReset = {
+  reset: true;
+  commitment: { seedHash: string; nonce: number };
+  clearedTables: string[];
+};

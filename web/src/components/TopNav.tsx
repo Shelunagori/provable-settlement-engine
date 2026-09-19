@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Skeleton, StatusDot } from './ui.tsx';
+import { Button, Skeleton, StatusDot } from './ui.tsx';
 import { ThemeRow, ThemeToggle } from './ThemeToggle.tsx';
 import { CloseIcon, MenuIcon } from './icons.tsx';
 import { formatMinor } from '../format.ts';
@@ -7,22 +7,20 @@ import type { Theme } from '../theme.ts';
 import type { Me } from '../types.ts';
 
 const LINKS = [
-  { href: '#demo', label: 'Demo' },
-  { href: '#activity', label: 'Activity' },
+  { href: '#play', label: 'Play' },
+  { href: '#bets', label: 'My bets' },
+  { href: '#fairness', label: 'Fairness' },
   { href: '#proofs', label: 'Proofs' },
-  { href: '#how', label: 'How it works' },
 ];
 
-const Balance = ({ me, compact = false }: { me: Me | null; compact?: boolean }) => (
-  <div
-    className={`rounded-lg border border-line bg-surface px-3 py-1.5 text-right ${compact ? '' : 'min-w-[7rem]'}`}
-  >
+const Balance = ({ me }: { me: Me | null }) => (
+  <div className="rounded-lg border border-line bg-surface px-3 py-1.5 text-right">
     {me ? (
       <p className="num text-base font-semibold leading-tight">{formatMinor(me.balanceMinor)}</p>
     ) : (
       <Skeleton className="ml-auto h-4 w-16" />
     )}
-    <p className="text-[10px] uppercase tracking-wider text-muted">Demo credits</p>
+    <p className="text-[10px] uppercase tracking-wider text-muted">Credits</p>
   </div>
 );
 
@@ -32,16 +30,19 @@ export const TopNav = ({
   me,
   theme,
   setTheme,
+  resetAvailable,
+  onReset,
 }: {
   apiUp: boolean;
   apiLoading: boolean;
   me: Me | null;
   theme: Theme;
   setTheme: (t: Theme) => void;
+  resetAvailable: boolean;
+  onReset: () => void;
 }) => {
   const [menu, setMenu] = useState(false);
 
-  // A menu that survives a rotation into desktop width would be a trap.
   useEffect(() => {
     if (!menu) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenu(false);
@@ -52,10 +53,10 @@ export const TopNav = ({
   const status = apiLoading ? (
     <StatusDot tone="pending" label="Checking" />
   ) : apiUp ? (
-    <StatusDot tone="accent" label="API online" />
+    <StatusDot tone="accent" label="Online" />
   ) : (
     <span className="text-refusal">
-      <StatusDot tone="refusal" label="API offline" />
+      <StatusDot tone="refusal" label="Offline" />
     </span>
   );
 
@@ -66,8 +67,8 @@ export const TopNav = ({
           ledgerproof
         </a>
 
-        {/* Links collapse well before the tablet breakpoint so 768px never
-            renders a squeezed desktop header. */}
+        {/* Collapsed well before tablet width, so 768px never renders a
+            squeezed desktop header. */}
         <nav aria-label="Sections" className="hidden lg:block">
           <ul className="flex gap-5 text-sm text-ink-2">
             {LINKS.map((l) => (
@@ -83,6 +84,13 @@ export const TopNav = ({
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
           <span className="hidden text-xs sm:inline">{status}</span>
           <Balance me={me} />
+          {resetAvailable && (
+            <span className="hidden lg:inline">
+              <Button variant="secondary" size="sm" onClick={onReset}>
+                Reset demo
+              </Button>
+            </span>
+          )}
           <span className="hidden lg:inline">
             <ThemeToggle theme={theme} setTheme={setTheme} />
           </span>
@@ -135,6 +143,20 @@ export const TopNav = ({
                   </a>
                 </li>
               ))}
+              {resetAvailable && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenu(false);
+                      onReset();
+                    }}
+                    className="block w-full rounded-lg px-2 py-2 text-left hover:bg-subtle"
+                  >
+                    Reset demo
+                  </button>
+                </li>
+              )}
             </ul>
 
             <div className="mt-5 border-t border-line pt-5">

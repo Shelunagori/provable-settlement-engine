@@ -25,27 +25,50 @@ mutation that turns its test red — in **[docs/INVARIANTS.md](docs/INVARIANTS.m
 
 ## 60-second tour
 
-Run locally (below), open the console, and follow the guided demo down the page.
-Each step calls the live API; the interface decides nothing.
+Run locally (below) and open the console. The demo is a wagering flow first:
 
-| Time | Do this | What it proves |
+| Step | Do this | What it proves |
 |---|---|---|
-| 0–10s | Read the hero and the live proof rail | `Σ postings = 0` is a live database check, not a constant |
-| 10–20s | **Add 10.00** | One journal entry, two postings, balance moves, Σ still 0 |
-| 20–32s | **Run demo** | Roll, win/loss, payout, both entry ids, seed hash, nonce |
-| 32–42s | **Reveal commitment** | The browser recomputes `SHA256(seed)` and confirms the commitment |
-| 42–50s | **Verify in browser** | `crypto.subtle` reproduces the roll the server recorded |
-| 50–55s | **Attempt balance write** | `404 NO_SUCH_ENDPOINT` — there is nothing to write |
-| 55–60s | Advanced proofs → **Run duplicate test** | 20 real HTTP deliveries → **1 posted, 19 deduplicated**, one entry |
+| 1 | **Reset demo** | Returns the whole demo to a fresh install: no credits, no bets, one active seed |
+| 2 | **Add 10 credits** | Money enters as a payment webhook and becomes one balanced journal entry |
+| 3 | **Place bet** | The server settles it: result, win or loss, payout, and two more entries |
+| 4 | Read the result | Balance updates, and the bet appears under *Recent bets* |
+| 5 | **Reveal & verify** | Your browser recomputes the same result with `crypto.subtle`, without asking the server |
 
-Under *Advanced proofs* the same system is available without the guided path:
-the raw ledger and journal (*Ledger*), the duplicate-payment storm (*Duplicate
-protection*), every refusal code the server enforces (*Server rules*), revealed
-seed history (*Fairness*) and affiliate accrual (*Affiliate*).
+Refreshing the browser does **not** reset your wallet. The demo state lives in
+PostgreSQL, so credits survive a reload — which is the point: the balance is
+server-side, derived from the ledger, and the browser holds none of it. Use
+**Reset demo** for a clean environment.
+
+Under *Advanced proofs* the raw evidence is still there: the ledger and journal
+with a live balance check and the balance-write refusal (*Ledger*), the
+duplicate-payment storm (*Duplicate protection*), every refusal code the server
+enforces (*Server rules*), revealed seed history (*Fairness*) and affiliate
+accrual (*Affiliate*).
 
 The console is light by default and offers Light / Dark / System, remembered in
 `localStorage`. There is no endpoint that stores a theme, and adding one would
 mean the interface holding state the server does not know about.
+
+### Demo reset
+
+`POST /demo/reset` exists only when the API is started with:
+
+```
+DEMO_RESET_ENABLED=true
+```
+
+Without it the route answers 404 like any unknown path. The flag is deliberately
+separate from `NODE_ENV`: the public demo runs with `NODE_ENV=production` and
+wants the reset, while a real deployment of this engine runs the same way and
+must not have it.
+
+The reset takes no parameters — there is no account id to pass, so it cannot be
+aimed at anything but the fixed demo dataset. It clears demo activity, reseeds
+the chart of accounts and installs one active server seed, all in a single
+transaction. It writes no balance and could not: there is no balance column, and
+postings stay append-only to every path the product exposes. It is an
+environment lifecycle operation, not a financial one.
 
 ## Architecture
 
