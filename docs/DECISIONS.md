@@ -14,8 +14,12 @@ zero.
 *Alternative considered:* validating the sum in `postEntry()` before insert.
 Rejected because it is only as good as the discipline of every future caller.
 A trigger holds even for a manual `psql` session, a migration, or a bug in the
-application layer. `postEntry()` still validates early so callers get a clean
-error, but the trigger is the authority.
+application layer.
+
+`postEntry()` does not check the sum at all, and that is deliberate rather than
+an omission — D14 has the reasoning. One consequence is worth stating here: an
+unbalanced entry is refused by `COMMIT`, so the error surfaces from `withTx()`
+rather than from the `postEntry()` call that built it.
 
 It is deferred rather than immediate because the postings of one entry are
 inserted as separate rows; an immediate trigger would fire after the first row
